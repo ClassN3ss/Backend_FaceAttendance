@@ -103,7 +103,7 @@ exports.getActiveSessionByClass = async (req, res) => {
       closeAt: { $gte: now },
     });
 
-    if (!session) return res.status(204).json({ message: "❌ ไม่มี session ที่เปิดอยู่" });
+    if (!session) return res.status(200).json(null);
 
     res.json(session);
   } catch (error) {
