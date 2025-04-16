@@ -103,6 +103,8 @@ exports.getActiveSessionByClass = async (req, res) => {
       closeAt: { $gte: now },
     });
 
+    res.set('Cache-Control', 'no-store');
+
     if (!session) return res.status(200).json(null);
 
     res.json(session);
