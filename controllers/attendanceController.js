@@ -3,7 +3,6 @@ const FaceScanLog = require("../models/FaceScanLog");
 const CheckinSession = require("../models/CheckinSession");
 const User = require("../models/User");
 
-// 🧠 คำนวณระยะทาง (เมตร) ระหว่าง 2 พิกัด
 const getDistanceInMeters = (lat1, lon1, lat2, lon2) => {
   const R = 6371000;
   const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -19,11 +18,10 @@ const getDistanceInMeters = (lat1, lon1, lat2, lon2) => {
 
 exports.checkIn = async (req, res) => {
   try {
-    const { fullName, latitude, longitude, sessionId, locationName } = req.body;
-    const tokenUserId = req.user?.id;
+    const { studentId, fullName, latitude, longitude, sessionId, locationName } = req.body;
 
     const missingFields = [];
-    if (!tokenUserId) missingFields.push("studentId (from token)");
+    if (!studentId) missingFields.push("studentId");
     if (!fullName) missingFields.push("fullName");
     if (!latitude) missingFields.push("latitude");
     if (!longitude) missingFields.push("longitude");
@@ -37,7 +35,6 @@ exports.checkIn = async (req, res) => {
     }
 
     const now = new Date();
-
     const session = await CheckinSession.findById(sessionId).populate({
       path: "classId",
       populate: { path: "teacherId", select: "fullName" },
@@ -72,13 +69,13 @@ exports.checkIn = async (req, res) => {
       }
     }
 
-    const user = await User.findById(tokenUserId);
+    const user = await User.findOne({ studentId: String(studentId).trim() });
     if (!user) {
       return res.status(404).json({ message: "ไม่พบผู้ใช้ในระบบ" });
     }
 
     const duplicate = await Attendance.findOne({
-      studentId: user._id,
+      studentId: studentId,
       sessionId,
     });
     if (duplicate) {
@@ -88,7 +85,7 @@ exports.checkIn = async (req, res) => {
     const status = now <= session.closeAt ? "Present" : "Late";
 
     await Attendance.create({
-      studentId: user._id,
+      studentId: studentId,
       fullName,
       classId: session.classId._id,
       courseCode: session.classId.courseCode,
@@ -173,8 +170,6 @@ exports.getAttendanceByClass = async (req, res) => {
       else if (rec.status === "Late") summary[sid].late++;
       else if (rec.status === "Absent") summary[sid].absent++;
     }
-
-    console.log("📌 Attendance summary:", summary);
 
     res.json(summary);
   } catch (err) {
