@@ -11,6 +11,10 @@ exports.openSession = async (req, res) => {
     const open = new Date(openAt);
     const close = new Date(closeAt);
 
+    if (isNaN(open) || isNaN(close)) {
+      return res.status(400).json({ message: "❌ เวลาที่ระบุไม่ถูกต้อง" });
+    }
+
     const overlap = await CheckinSession.findOne({
       classId,
       status: "active",
@@ -44,8 +48,6 @@ exports.openSession = async (req, res) => {
   }
 };
 
-
-// ✅ ยกเลิก session
 exports.cancelSession = async (req, res) => {
   try {
     const { id } = req.params;
@@ -60,10 +62,10 @@ exports.cancelSession = async (req, res) => {
   }
 };
 
-// ✅ อัปเดต session ที่หมดเวลาให้เป็น expired (สำหรับ cron job)
 exports.autoExpireSessions = async () => {
   try {
     const now = new Date();
+    console.log("🕒 Running expire session check at:", now.toISOString());
     const expiredSessions = await CheckinSession.updateMany(
       { status: "active", closeAt: { $lt: now } },
       { $set: { status: "expired" } }
@@ -74,7 +76,6 @@ exports.autoExpireSessions = async () => {
   }
 };
 
-// ✅ ดึง session ที่เปิดอยู่ทั้งหมด (admin)
 exports.getActiveSessions = async (req, res) => {
   try {
     const now = new Date();
@@ -90,7 +91,6 @@ exports.getActiveSessions = async (req, res) => {
   }
 };
 
-// ✅ ดึง session ปัจจุบันของห้องนั้น ๆ (student)
 exports.getActiveSessionByClass = async (req, res) => {
   try {
     const { classId } = req.params;
