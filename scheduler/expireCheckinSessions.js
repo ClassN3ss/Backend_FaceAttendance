@@ -15,7 +15,7 @@ const startSessionExpiryCron = () => {
       console.log("🕒 Running expire session check:", now.toISOString());
 
       const result = await CheckinSession.updateMany(
-        { status: "active", closeAt: { $lt: now } },
+        { status: { $eq: "active" }, closeAt: { $lt: now } },
         { $set: { status: "expired" } }
       );
 

@@ -90,7 +90,6 @@ exports.getActiveSessions = async (req, res) => {
   }
 };
 
-// ✅ ดึง session ปัจจุบันของห้องนั้น ๆ (student)
 exports.getActiveSessionByClass = async (req, res) => {
   try {
     const { classId } = req.params;
@@ -99,8 +98,7 @@ exports.getActiveSessionByClass = async (req, res) => {
     const session = await CheckinSession.findOne({
       classId,
       status: "active",
-      openAt: { $lte: now },
-      closeAt: { $gte: now },
+      closeAt: { $gt: now } // <= ใช้แค่ closeAt เพื่อลดการพึ่ง cron job
     });
 
     if (!session) return res.status(204).json({ message: "❌ ไม่มี session ที่เปิดอยู่" });
