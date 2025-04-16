@@ -95,13 +95,19 @@ exports.getActiveSessionByClass = async (req, res) => {
     const { classId } = req.params;
     const now = new Date();
 
-    const session = await CheckinSession.findOne({
+    let session = await CheckinSession.findOne({
       classId,
-      status: "active",
-      closeAt: { $gt: now } // <= ใช้แค่ closeAt เพื่อลดการพึ่ง cron job
+      status: "active"
     });
 
     if (!session) return res.status(204).json({ message: "❌ ไม่มี session ที่เปิดอยู่" });
+
+    // ✅ ตรวจสอบว่าหมดเวลาหรือยัง
+    if (new Date(session.closeAt) < now) {
+      session.status = "expired";
+      await session.save();
+      return res.status(204).json({ message: "⏰ session หมดเวลาแล้ว" });
+    }
 
     res.json(session);
   } catch (error) {
