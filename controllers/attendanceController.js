@@ -19,11 +19,11 @@ const getDistanceInMeters = (lat1, lon1, lat2, lon2) => {
 
 exports.checkIn = async (req, res) => {
   try {
-    const { studentId, fullName, latitude, longitude, sessionId, locationName } = req.body;
-    const cleanStudentId = String(studentId).trim();
+    const { fullName, latitude, longitude, sessionId, locationName } = req.body;
+    const tokenUserId = req.user?.id;
 
     const missingFields = [];
-    if (!cleanStudentId) missingFields.push("studentId");
+    if (!tokenUserId) missingFields.push("studentId (from token)");
     if (!fullName) missingFields.push("fullName");
     if (!latitude) missingFields.push("latitude");
     if (!longitude) missingFields.push("longitude");
@@ -72,8 +72,13 @@ exports.checkIn = async (req, res) => {
       }
     }
 
+    const user = await User.findById(tokenUserId);
+    if (!user) {
+      return res.status(404).json({ message: "ไม่พบผู้ใช้ในระบบ" });
+    }
+
     const duplicate = await Attendance.findOne({
-      studentId: cleanStudentId,
+      studentId: user._id,
       sessionId,
     });
     if (duplicate) {
@@ -83,7 +88,7 @@ exports.checkIn = async (req, res) => {
     const status = now <= session.closeAt ? "Present" : "Late";
 
     await Attendance.create({
-      studentId: cleanStudentId,
+      studentId: user._id,
       fullName,
       classId: session.classId._id,
       courseCode: session.classId.courseCode,
@@ -101,11 +106,6 @@ exports.checkIn = async (req, res) => {
       withMapPreview: session.withMapPreview || false,
       teacherName: session.classId.teacherId?.fullName || "ไม่ทราบชื่ออาจารย์",
     });
-
-    const user = await User.findOne({ studentId: cleanStudentId });
-    if (!user) {
-      return res.status(404).json({ message: "ไม่พบผู้ใช้ในระบบ" });
-    }
 
     await FaceScanLog.create({
       userId: user._id,
