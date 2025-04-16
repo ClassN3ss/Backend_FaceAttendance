@@ -11,10 +11,6 @@ exports.openSession = async (req, res) => {
     const open = new Date(openAt);
     const close = new Date(closeAt);
 
-    if (isNaN(open) || isNaN(close)) {
-      return res.status(400).json({ message: "❌ เวลาที่ระบุไม่ถูกต้อง" });
-    }
-
     const overlap = await CheckinSession.findOne({
       classId,
       status: "active",
@@ -48,6 +44,8 @@ exports.openSession = async (req, res) => {
   }
 };
 
+
+// ✅ ยกเลิก session
 exports.cancelSession = async (req, res) => {
   try {
     const { id } = req.params;
@@ -62,10 +60,10 @@ exports.cancelSession = async (req, res) => {
   }
 };
 
+// ✅ อัปเดต session ที่หมดเวลาให้เป็น expired (สำหรับ cron job)
 exports.autoExpireSessions = async () => {
   try {
     const now = new Date();
-    console.log("🕒 Running expire session check at:", now.toISOString());
     const expiredSessions = await CheckinSession.updateMany(
       { status: "active", closeAt: { $lt: now } },
       { $set: { status: "expired" } }
@@ -76,6 +74,7 @@ exports.autoExpireSessions = async () => {
   }
 };
 
+// ✅ ดึง session ที่เปิดอยู่ทั้งหมด (admin)
 exports.getActiveSessions = async (req, res) => {
   try {
     const now = new Date();
@@ -91,27 +90,22 @@ exports.getActiveSessions = async (req, res) => {
   }
 };
 
-// controllers/checkinSessionController.js
-
+// ✅ ดึง session ปัจจุบันของห้องนั้น ๆ (student)
 exports.getActiveSessionByClass = async (req, res) => {
   try {
     const { classId } = req.params;
-
     const now = new Date();
-    const earlyNow = new Date(now.getTime() + 3000); // เผื่อ 3 วิข้างหน้า
 
     const session = await CheckinSession.findOne({
       classId,
       status: "active",
-      openAt: { $lte: earlyNow },     // ✅ ยืดเวลาให้เผื่อเปิด session พึ่งเปิด
+      openAt: { $lte: now },
       closeAt: { $gte: now },
     });
 
-    res.set('Cache-Control', 'no-store');
+    if (!session) return res.status(204).json({ message: "❌ ไม่มี session ที่เปิดอยู่" });
 
-    if (!session) return res.status(204).json(); // ไม่มี session
-
-    res.status(200).json(session);
+    res.json(session);
   } catch (error) {
     res.status(500).json({ message: "❌ ไม่สามารถโหลด session", error: error.message });
   }
