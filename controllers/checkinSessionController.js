@@ -91,24 +91,33 @@ exports.getActiveSessions = async (req, res) => {
   }
 };
 
+// controllers/checkinSessionController.js
+
 exports.getActiveSessionByClass = async (req, res) => {
   try {
     const { classId } = req.params;
     const now = new Date();
 
+    // เพิ่ม buffer เวลาเผื่อโหลดไม่ทัน
+    const nowPlus10Sec = new Date(now.getTime() + 10000);
+    const nowMinus10Sec = new Date(now.getTime() - 10000);
+
     const session = await CheckinSession.findOne({
       classId,
       status: "active",
-      openAt: { $lte: now },
-      closeAt: { $gte: now },
+      openAt: { $lte: nowPlus10Sec },     // เผื่อ session เปิดในไม่กี่วินี้
+      closeAt: { $gte: nowMinus10Sec }    // เผื่อยังไม่ expired เป๊ะ ๆ
     });
 
-    res.set('Cache-Control', 'no-store');
+    res.set("Cache-Control", "no-store");
 
     if (!session) return res.status(204).json();
-
     res.json(session);
+
   } catch (error) {
-    res.status(500).json({ message: "❌ ไม่สามารถโหลด session", error: error.message });
+    res.status(500).json({
+      message: "❌ ไม่สามารถโหลด session",
+      error: error.message,
+    });
   }
 };
