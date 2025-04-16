@@ -105,7 +105,7 @@ exports.getActiveSessionByClass = async (req, res) => {
 
     res.set('Cache-Control', 'no-store');
 
-    if (!session) return res.status(200).json(null);
+    if (!session) return res.status(204).json();
 
     res.json(session);
   } catch (error) {
