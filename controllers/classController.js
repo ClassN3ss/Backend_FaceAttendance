@@ -5,6 +5,7 @@ const Class = require("../models/Class");
 const Enroll = require("../models/Enroll");
 const Attendance = require("../models/Attendance");
 const FaceScanLog = require("../models/FaceScanLog");
+const EnrollmentRequest = require("../models/EnrollmentRequest");
 const multer = require("multer");
 
 const upload = multer({ storage: multer.memoryStorage() });
@@ -176,6 +177,7 @@ exports.deleteClass = async (req, res) => {
     await Enroll.deleteMany({ classId: req.params.id });
     await Attendance.deleteMany({ classId: req.params.id });
     await FaceScanLog.deleteMany({ classId: req.params.id });
+    await EnrollmentRequest.deleteMany({ classId: req.params.id });
 
     res.json({ message: "✅ ลบคลาสแล้ว และลบการลงทะเบียนของคลาสนี้เรียบร้อย" });
   } catch (err) {
