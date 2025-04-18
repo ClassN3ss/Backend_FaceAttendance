@@ -33,7 +33,7 @@ exports.openSession = async (req, res) => {
       location: {
         latitude: location?.latitude ?? null,
         longitude: location?.longitude ?? null,
-        radiusInMeters: location?.radiusInMeters ?? 30,
+        radiusInMeters: location?.radiusInMeters ?? 50,
         name: location?.name ?? null,
       },
     });
