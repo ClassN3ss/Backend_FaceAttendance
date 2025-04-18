@@ -10,7 +10,7 @@ const checkinSessionSchema = new mongoose.Schema({
   location: {
     latitude: { type: Number },
     longitude: { type: Number },
-    radiusInMeters: { type: Number, default: 100 },
+    radiusInMeters: { type: Number, default: 30 },
     name: { type: String },
   }
 });
