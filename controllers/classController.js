@@ -46,7 +46,7 @@ exports.createClass = [
 ];
 
 // ✅ Internal: อ่านข้อมูลจากไฟล์ Excel และสร้างคลาส
-async function createClassFromXlsx(buffer, email, section) {
+async function createClassFromXlsx(buffer, email) {
   const workbook = xlsx.read(buffer, { type: "buffer" });
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
   const rows = xlsx.utils.sheet_to_json(sheet, { header: 1 });
@@ -57,10 +57,12 @@ async function createClassFromXlsx(buffer, email, section) {
 
   const courseParts = courseRow[0].split(/\s+/);
   const courseCode = courseParts[1];
-  let courseName = courseParts.slice(2).join(" ");
-  courseName = removeSectionFromCourseName(courseName);
 
-  const sectionStr = String(section || "1");
+  let fullCourseName = courseParts.slice(2).join(" ");
+  const sectionMatch = fullCourseName.match(/ตอน\s*(\d+)/);
+  const sectionStr = sectionMatch ? sectionMatch[1] : "1";
+  const courseName = fullCourseName.replace(/ตอน\s*\d+/, '').trim();
+
   const teacherName = cleanName(teacherRow[5]);
 
   let teacher = await User.findOne({ fullName: teacherName.trim(), role: "teacher" });
@@ -86,11 +88,27 @@ async function createClassFromXlsx(buffer, email, section) {
 
   const students = [];
   const seen = new Set();
+  let hasStarted = false;
+
   for (let i = 9; i < rows.length; i++) {
     const row = rows[i];
     const studentId = String(row[1] || "").trim();
     const fullName = String(row[2] || "").trim();
-    if (!studentId || !fullName || seen.has(studentId)) continue;
+
+    if (!studentId && !fullName) {
+      // ตรวจว่าหลังจากนี้มีข้อมูลอีกไหม
+      const hasMore = rows.slice(i + 1).some(r => (r[1]?.toString().trim() || r[2]?.toString().trim()));
+      if (hasMore) {
+        throw new Error(`❌ พบแถวว่างก่อนจบรายชื่อ (แถวที่ ${i + 1})`);
+      }
+      break; // ไม่มีข้อมูลแล้ว → หยุด
+    }
+
+    if (!studentId || !fullName) {
+      throw new Error(`❌ ข้อมูลไม่ครบในแถวที่ ${i + 1}`);
+    }
+
+    if (seen.has(studentId)) continue;
     seen.add(studentId);
 
     const studentEmail = `s${studentId}@email.kmutnb.ac.th`;
