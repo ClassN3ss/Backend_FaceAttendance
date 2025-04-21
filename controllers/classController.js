@@ -16,22 +16,26 @@ function cleanName(raw) {
     .trim();
 }
 
+function removeSectionFromCourseName(name) {
+  return name.replace(/ตอน\s*\d+/g, '').trim();
+}
+
 exports.createClass = [
   upload.single("file"),
   async (req, res) => {
     try {
-      const { email } = req.body;
+      const { email, section } = req.body;
       const file = req.file;
 
       if (!file || !email) {
         return res.status(400).json({ message: "กรุณาแนบไฟล์และอีเมลอาจารย์" });
       }
 
-      const { classDoc, newTeacherCreated } = await createClassFromXlsx(file.buffer, email);
+      const { classDoc, newTeacherCreated } = await createClassFromXlsx(file.buffer, email, section || "1");
 
       const message = newTeacherCreated
-        ? `สร้างคลาสและเพิ่มอาจารย์ใหม่ (${email}) สำเร็จ`
-        : `สร้างคลาสสำเร็จ`;
+        ? ` สร้างคลาสและเพิ่มอาจารย์ใหม่ (${email}) สำเร็จ`
+        : ` สร้างคลาสสำเร็จ`;
 
       res.json({ message, classId: classDoc._id });
     } catch (err) {
@@ -40,7 +44,7 @@ exports.createClass = [
   }
 ];
 
-async function createClassFromXlsx(buffer, email) {
+async function createClassFromXlsx(buffer, email, section) {
   const workbook = xlsx.read(buffer, { type: "buffer" });
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
   const rows = xlsx.utils.sheet_to_json(sheet, { header: 1 });
@@ -51,14 +55,10 @@ async function createClassFromXlsx(buffer, email) {
 
   const courseParts = courseRow[0].split(/\s+/);
   const courseCode = courseParts[1];
+  let courseName = courseParts.slice(2).join(" ");
+  courseName = removeSectionFromCourseName(courseName);
 
-  let fullCourseName = courseParts.slice(2).join(" ");
-
-  const sectionMatch = fullCourseName.match(/ตอน\s*(\d+)/);
-  const sectionStr = sectionMatch ? sectionMatch[1] : "1";
-
-  const courseName = fullCourseName.replace(/ตอน\s*\d+/g, '').trim();
-
+  const sectionStr = String(section || "1");
   const teacherName = cleanName(teacherRow[5]);
 
   let teacher = await User.findOne({ fullName: teacherName.trim(), role: "teacher" });
@@ -82,17 +82,45 @@ async function createClassFromXlsx(buffer, email) {
     }
   }
 
+  // ✅ ค้นหา index ของ header ก่อน
+  const headerRowIndex = rows.findIndex(row =>
+    row.includes("ลำดับ") && row.includes("รหัสนักศึกษา") && row.includes("ชื่อ - สกุล")
+  );
+
+  if (headerRowIndex === -1) throw new Error("ไม่พบหัวตาราง 'ลำดับ', 'รหัสนักศึกษา', 'ชื่อ - สกุล'");
+
   const students = [];
   const seen = new Set();
 
-  for (let i = 9; i < rows.length; i++) {
+  let hasData = false;
+
+  for (let i = headerRowIndex + 1; i < rows.length; i++) {
     const row = rows[i];
-    const studentId = String(row[1] || "").trim();
-    const fullName = String(row[2] || "").trim();
+    const studentId = row[1]?.toString().trim();
+    const fullName = row[2]?.toString().trim();
 
-    if (!studentId && !fullName) break;
+    const bothEmpty = (!studentId || studentId === "") && (!fullName || fullName === "");
 
-    if (!studentId || !fullName || seen.has(studentId)) continue;
+    if (i === headerRowIndex + 1 && bothEmpty) {
+      throw new Error(`แถวแรกหลัง header ว่างเปล่า กรุณาอัปโหลดไฟล์ใหม่`);
+    }
+
+    if (bothEmpty) {
+      // ตรวจดูแถวถัดไปทั้งหมดจนสุดว่ามีข้อมูลไหม
+      const restHasData = rows.slice(i + 1, 100).some(r => {
+        const sid = r[1]?.toString().trim();
+        const name = r[2]?.toString().trim();
+        return sid || name;
+      });
+      if (!restHasData) break; // ✅ จบ loop อย่างปลอดภัย
+      else continue;
+    }
+
+    if (!studentId || !fullName) {
+      throw new Error(`ข้อมูลไม่ครบในแถวที่ ${i + 1} กรุณาอัปโหลดไฟล์ใหม่`);
+    }
+
+    if (seen.has(studentId)) continue;
     seen.add(studentId);
 
     const studentEmail = `s${studentId}@email.kmutnb.ac.th`;
@@ -116,9 +144,10 @@ async function createClassFromXlsx(buffer, email) {
     }
 
     students.push(user._id);
+    hasData = true;
   }
 
-  if (students.length === 0) throw new Error("ไม่พบนักศึกษาในไฟล์");
+  if (!hasData || students.length === 0) throw new Error("ไม่พบนักศึกษาในไฟล์");
 
   let classDoc = await Class.findOne({ courseCode, section: sectionStr });
   if (classDoc) {
