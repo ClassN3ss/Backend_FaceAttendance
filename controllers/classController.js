@@ -88,39 +88,38 @@ async function createClassFromXlsx(buffer, email) {
 
   const students = [];
   const seen = new Set();
-  let hasStarted = false;
-
   for (let i = 8; i < rows.length; i++) {
     const row = rows[i];
-    const studentId = String(row[1] || "").trim();
+    const rawId = String(row[1] || "").trim();     // รหัสที่มีขีด เช่น 64-040626-3635-8
+    const emailId = rawId.replace(/-/g, "");        // ลบขีดออก เช่น 6404062636358
     const fullName = String(row[2] || "").trim();
 
-    if (!studentId && !fullName) {
-      // ตรวจว่าหลังจากนี้มีข้อมูลอีกไหม
+    if (!rawId && !fullName) {
       const hasMore = rows.slice(i + 1).some(r => (r[1]?.toString().trim() || r[2]?.toString().trim()));
       if (hasMore) {
         throw new Error(`❌ พบแถวว่างก่อนจบรายชื่อ (แถวที่ ${i + 1})`);
       }
-      break; // ไม่มีข้อมูลแล้ว → หยุด
+      break;
     }
 
-    if (!studentId || !fullName) {
+    if (!rawId || !fullName) {
       throw new Error(`❌ ข้อมูลไม่ครบในแถวที่ ${i + 1}`);
     }
 
-    if (seen.has(studentId)) continue;
-    seen.add(studentId);
+    if (seen.has(rawId)) continue;
+    seen.add(rawId);
 
-    const studentEmail = `s${studentId}@email.kmutnb.ac.th`;
-    let user = await User.findOne({ studentId });
+    const studentEmail = `s${emailId}@email.kmutnb.ac.th`;
+
+    let user = await User.findOne({ studentId: rawId });
 
     if (!user) {
-      const hashed = await bcrypt.hash(studentId, 10);
+      const hashed = await bcrypt.hash(rawId, 10);
       user = await User.create({
-        studentId,
-        username: studentId,
+        studentId: rawId,             // ✔️ เก็บแบบมีขีด
+        username: rawId,
         fullName,
-        email: studentEmail,
+        email: studentEmail,          // ✔️ ใช้แบบไม่มีขีด
         password_hash: hashed,
         role: "student"
       });
