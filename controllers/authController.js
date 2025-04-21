@@ -24,14 +24,16 @@ exports.register = async (req, res) => {
     }
 
     // ✅ ทั้งชื่อและรหัสตรงกัน
-    const username = studentId;
-    const password_hash = await bcrypt.hash(studentId, 10);
+    const strippedId = studentId.replace(/-/g, ""); // ตัดขีดออก
+
+    const username = strippedId;
+    const password_hash = await bcrypt.hash(strippedId, 10); // เข้ารหัสแบบไม่มีขีด
 
     foundById.username = username;
     foundById.password_hash = password_hash;
     await foundById.save();
 
-    res.json({ username, password: studentId });
+    res.json({ username, password: strippedId });
   } catch (err) {
     res.status(500).json({ message: "❌ เกิดข้อผิดพลาด", error: err.message });
   }
