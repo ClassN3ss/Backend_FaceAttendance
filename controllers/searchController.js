@@ -1,7 +1,6 @@
 const User = require("../models/User");
 const Class = require("../models/Class");
 
-// ✅ ค้นหาผู้ใช้จากชื่อหรือรหัส
 exports.searchUsers = async (req, res) => {
   try {
     const { q, role } = req.query;
@@ -22,11 +21,10 @@ exports.searchUsers = async (req, res) => {
     const users = await User.find(query).limit(10);
     res.json(users);
   } catch (err) {
-    res.status(500).json({ message: "❌ ค้นหาผู้ใช้ล้มเหลว", error: err.message });
+    res.status(500).json({ message: "ค้นหาผู้ใช้ล้มเหลว", error: err.message });
   }
 };
 
-// ✅ ค้นหาคลาสจากชื่อ / รหัสวิชา / section
 exports.searchClasses = async (req, res) => {
   try {
     const { q } = req.query;
@@ -42,6 +40,6 @@ exports.searchClasses = async (req, res) => {
 
     res.json(classes);
   } catch (err) {
-    res.status(500).json({ message: "❌ ค้นหาคลาสล้มเหลว", error: err.message });
+    res.status(500).json({ message: "ค้นหาคลาสล้มเหลว", error: err.message });
   }
 };

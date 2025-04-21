@@ -56,13 +56,13 @@ exports.verifyTeacherFace = async (req, res) => {
     const distance = cosineDistance(faceDescriptor, teacher.faceDescriptor);
 
     if (distance > 0.5) {
-      return res.status(403).json({ message: "❌ ใบหน้าไม่ตรงกับอาจารย์" });
+      return res.status(403).json({ message: "ใบหน้าไม่ตรงกับอาจารย์" });
     }
 
     teacher.lastVerifiedAt = new Date(); // (Optional) สำหรับบันทึกเวลา
     await teacher.save();
 
-    res.json({ message: "✅ ใบหน้าอาจารย์ถูกต้อง", distance: distance.toFixed(4) });
+    res.json({ message: "ใบหน้าอาจารย์ถูกต้อง", distance: distance.toFixed(4) });
   } catch (err) {
     res.status(500).json({ message: "ตรวจสอบใบหน้าอาจารย์ล้มเหลว", error: err.message });
   }

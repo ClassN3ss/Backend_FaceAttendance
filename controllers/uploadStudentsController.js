@@ -4,7 +4,7 @@ const path = require('path');
 
 exports.uploadCSV = async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ message: '❌ No file uploaded' });
+    if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
 
     const filePath = path.join(__dirname, '../uploads', req.file.filename);
     const parsedUsers = await parseCSV.parseCSVAndHash(filePath);
@@ -26,9 +26,9 @@ exports.uploadCSV = async (req, res) => {
       inserted.push(user.username);
     }
 
-    res.json({ message: '✅ Students created', count: inserted.length, inserted });
+    res.json({ message: 'Students created', count: inserted.length, inserted });
   } catch (err) {
-    console.error('❌ Upload error:', err);
-    res.status(500).json({ message: '❌ Failed to upload students', error: err.message });
+    console.error('Upload error:', err);
+    res.status(500).json({ message: 'Failed to upload students', error: err.message });
   }
 };

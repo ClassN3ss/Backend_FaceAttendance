@@ -18,7 +18,7 @@ router.get("/me", verifyToken, (req, res) => {
 
 router.get("/debug-token", verifyToken, (req, res) => {
   res.json({
-    message: "✅ Token is valid",
+    message: "Token is valid",
     user: req.user,
   });
 });

@@ -29,7 +29,7 @@ exports.checkIn = async (req, res) => {
 
     if (missingFields.length > 0) {
       return res.status(400).json({
-        message: "❌ ข้อมูลไม่ครบ",
+        message: "ข้อมูลไม่ครบ",
         missing: missingFields,
       });
     }
@@ -41,7 +41,7 @@ exports.checkIn = async (req, res) => {
     });
 
     if (!session) {
-      return res.status(404).json({ message: "❌ ไม่พบ session นี้" });
+      return res.status(404).json({ message: "ไม่พบ session นี้" });
     }
 
     if (
@@ -49,7 +49,7 @@ exports.checkIn = async (req, res) => {
       now < session.openAt ||
       now > session.closeAt
     ) {
-      return res.status(403).json({ message: "⛔ หมดเวลาเช็คชื่อแล้ว" });
+      return res.status(403).json({ message: "หมดเวลาเช็คชื่อแล้ว" });
     }
 
     if (session.location?.latitude && session.location?.longitude) {
@@ -62,7 +62,7 @@ exports.checkIn = async (req, res) => {
 
       if (distance > session.location.radiusInMeters) {
         return res.status(403).json({
-          message: `❌ คุณอยู่นอกพื้นที่เช็คชื่อ (${Math.round(distance)} เมตร)`,
+          message: `คุณอยู่นอกพื้นที่เช็คชื่อ (${Math.round(distance)} เมตร)`,
           distance,
           allowedRadius: session.location.radiusInMeters,
         });
@@ -79,7 +79,7 @@ exports.checkIn = async (req, res) => {
       sessionId,
     });
     if (duplicate) {
-      return res.status(409).json({ message: "⚠️ คุณเช็คชื่อในรอบนี้ไปแล้ว" });
+      return res.status(409).json({ message: "คุณเช็คชื่อในรอบนี้ไปแล้ว" });
     }
 
     const status = now <= session.closeAt ? "Present" : "Late";
@@ -117,9 +117,9 @@ exports.checkIn = async (req, res) => {
       status: "success",
     });
 
-    res.json({ message: "✅ เช็คชื่อสำเร็จ", status });
+    res.json({ message: "เช็คชื่อสำเร็จ", status });
   } catch (err) {
-    res.status(500).json({ message: "❌ เกิดข้อผิดพลาด", error: err.message });
+    res.status(500).json({ message: "เกิดข้อผิดพลาด", error: err.message });
   }
 };
 
@@ -144,7 +144,7 @@ exports.getAllFaceScanLogs = async (req, res) => {
 
     res.json(logs);
   } catch (err) {
-    res.status(500).json({ message: "❌ ไม่สามารถโหลดข้อมูลได้", error: err.message });
+    res.status(500).json({ message: "ไม่สามารถโหลดข้อมูลได้", error: err.message });
   }
 };
 
@@ -174,7 +174,7 @@ exports.getAttendanceByClass = async (req, res) => {
     res.json(summary);
   } catch (err) {
     res.status(500).json({
-      message: "❌ โหลดข้อมูลการเช็คชื่อไม่สำเร็จ",
+      message: "โหลดข้อมูลการเช็คชื่อไม่สำเร็จ",
       error: err.message,
     });
   }
@@ -187,7 +187,7 @@ exports.getAttendanceByClassRaw = async (req, res) => {
     res.json(records);
   } catch (err) {
     res.status(500).json({
-      message: "❌ โหลดข้อมูลการเช็คชื่อล้มเหลว",
+      message: "โหลดข้อมูลการเช็คชื่อล้มเหลว",
       error: err.message,
     });
   }

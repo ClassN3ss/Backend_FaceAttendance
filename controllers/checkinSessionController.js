@@ -5,7 +5,7 @@ exports.openSession = async (req, res) => {
     const { classId, openAt, closeAt, withTeacherFace, location, withMapPreview } = req.body;
 
     if (!openAt || !closeAt) {
-      return res.status(400).json({ message: "❌ ต้องมีเวลาที่ชัดเจน" });
+      return res.status(400).json({ message: "ต้องมีเวลาที่ชัดเจน" });
     }
 
     const open = new Date(openAt);
@@ -20,7 +20,7 @@ exports.openSession = async (req, res) => {
     });
 
     if (overlap) {
-      return res.status(400).json({ message: "❌ มี session ที่ทับเวลาอยู่แล้ว" });
+      return res.status(400).json({ message: "มี session ที่ทับเวลาอยู่แล้ว" });
     }
 
     const session = await CheckinSession.create({
@@ -38,29 +38,26 @@ exports.openSession = async (req, res) => {
       },
     });
 
-    res.status(201).json({ message: "✅ เปิดเวลาเช็คชื่อแล้ว", session });
+    res.status(201).json({ message: "เปิดเวลาเช็คชื่อแล้ว", session });
   } catch (err) {
-    res.status(500).json({ message: "❌ เปิด session ไม่สำเร็จ", error: err.message });
+    res.status(500).json({ message: "เปิด session ไม่สำเร็จ", error: err.message });
   }
 };
 
-
-// ✅ ยกเลิก session
 exports.cancelSession = async (req, res) => {
   try {
     const { id } = req.params;
     const session = await CheckinSession.findById(id);
-    if (!session) return res.status(404).json({ message: "❌ ไม่พบ session" });
+    if (!session) return res.status(404).json({ message: "ไม่พบ session" });
 
     session.status = "cancelled";
     await session.save();
-    res.json({ message: "🚫 ยกเลิก session แล้ว" });
+    res.json({ message: "ยกเลิก session แล้ว" });
   } catch (err) {
-    res.status(500).json({ message: "❌ ยกเลิกไม่สำเร็จ", error: err.message });
+    res.status(500).json({ message: "ยกเลิกไม่สำเร็จ", error: err.message });
   }
 };
 
-// ✅ อัปเดต session ที่หมดเวลาให้เป็น expired (สำหรับ cron job)
 exports.autoExpireSessions = async () => {
   try {
     const now = new Date();
@@ -68,13 +65,12 @@ exports.autoExpireSessions = async () => {
       { status: "active", closeAt: { $lt: now } },
       { $set: { status: "expired" } }
     );
-    console.log(`⏰ อัปเดตหมดเวลาแล้ว: ${expiredSessions.modifiedCount} sessions`);
+    console.log(`อัปเดตหมดเวลาแล้ว: ${expiredSessions.modifiedCount} sessions`);
   } catch (err) {
-    console.error("❌ ไม่สามารถอัปเดต session ที่หมดเวลา:", err.message);
+    console.error("ไม่สามารถอัปเดต session ที่หมดเวลา:", err.message);
   }
 };
 
-// ✅ ดึง session ที่เปิดอยู่ทั้งหมด (admin)
 exports.getActiveSessions = async (req, res) => {
   try {
     const now = new Date();
@@ -86,7 +82,7 @@ exports.getActiveSessions = async (req, res) => {
 
     res.json(sessions);
   } catch (err) {
-    res.status(500).json({ message: "❌ โหลด session ไม่สำเร็จ", error: err.message });
+    res.status(500).json({ message: "โหลด session ไม่สำเร็จ", error: err.message });
   }
 };
 
@@ -100,17 +96,16 @@ exports.getActiveSessionByClass = async (req, res) => {
       status: "active"
     });
 
-    if (!session) return res.status(204).json({ message: "❌ ไม่มี session ที่เปิดอยู่" });
+    if (!session) return res.status(204).json({ message: "ไม่มี session ที่เปิดอยู่" });
 
-    // ✅ ตรวจสอบว่าหมดเวลาหรือยัง
     if (new Date(session.closeAt) < now) {
       session.status = "expired";
       await session.save();
-      return res.status(204).json({ message: "⏰ session หมดเวลาแล้ว" });
+      return res.status(204).json({ message: "session หมดเวลาแล้ว" });
     }
 
     res.json(session);
   } catch (error) {
-    res.status(500).json({ message: "❌ ไม่สามารถโหลด session", error: error.message });
+    res.status(500).json({ message: "ไม่สามารถโหลด session", error: error.message });
   }
 };

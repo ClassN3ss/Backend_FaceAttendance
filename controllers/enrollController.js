@@ -7,7 +7,6 @@ exports.getEnrolledSubjects = async (req, res) => {
     const enrolled = await Enroll.find({ student: studentId, approved: true })
       .populate("classId", "courseCode courseName section");
 
-    // กรองเฉพาะ Enroll ที่ยังมี classId อยู่
     const subjects = enrolled
       .filter(e => e.classId && e.classId.courseCode && e.classId.courseName)
       .map(e => ({
@@ -19,6 +18,6 @@ exports.getEnrolledSubjects = async (req, res) => {
 
     res.json({ enrolled: subjects });
   } catch (err) {
-    res.status(500).json({ message: "❌ ดึงวิชาที่ลงทะเบียนล้มเหลว", error: err.message });
+    res.status(500).json({ message: "ดึงวิชาที่ลงทะเบียนล้มเหลว", error: err.message });
   }
 };

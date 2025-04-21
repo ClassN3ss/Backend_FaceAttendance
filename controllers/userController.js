@@ -3,7 +3,6 @@ const Enroll = require("../models/Enroll");
 const Class = require("../models/Class");
 const Attendance = require("../models/Attendance");
 
-// ✅ GET /users - โหลดผู้ใช้ทั้งหมด พร้อมข้อมูลคลาส (student/teacher)
 exports.getAllUsers = async (req, res) => {
   try {
     const users = await User.find({}, '-password -password_hash');
@@ -45,17 +44,15 @@ exports.getAllUsers = async (req, res) => {
   }
 };
 
-// ✅ GET /teachers
 exports.getTeachers = async (req, res) => {
   try {
     const teachers = await User.find({ role: 'teacher' }).select('fullName _id email username');
     res.json(teachers);
   } catch (err) {
-    res.status(500).json({ message: "❌ โหลดรายชื่ออาจารย์ล้มเหลว", error: err.message });
+    res.status(500).json({ message: "โหลดรายชื่ออาจารย์ล้มเหลว", error: err.message });
   }
 };
 
-// ✅ GET /search/users?q=&role=
 exports.searchUsers = async (req, res) => {
   try {
     const { q = '', role } = req.query;
@@ -77,11 +74,10 @@ exports.searchUsers = async (req, res) => {
 
     res.json(users);
   } catch (err) {
-    res.status(500).json({ message: "❌ ค้นหาผู้ใช้ล้มเหลว", error: err.message });
+    res.status(500).json({ message: "ค้นหาผู้ใช้ล้มเหลว", error: err.message });
   }
 };
 
-// ✅ PUT /users/:id
 exports.updateUser = async (req, res) => {
   try {
     const updates = req.body;
@@ -94,7 +90,6 @@ exports.updateUser = async (req, res) => {
   }
 };
 
-// ✅ DELETE /users/:id
 exports.deleteUser = async (req, res) => {
   try {
     const deleted = await User.findByIdAndDelete(req.params.id);
@@ -103,8 +98,8 @@ exports.deleteUser = async (req, res) => {
     await Enroll.deleteMany({ student: req.params.id });
     await Attendance.deleteMany({ studentId: deleted.studentId });
 
-    res.json({ message: '✅ ลบผู้ใช้แล้ว' });
+    res.json({ message: 'ลบผู้ใช้แล้ว' });
   } catch (err) {
-    res.status(500).json({ message: '❌ ลบผู้ใช้ล้มเหลว', error: err.message });
+    res.status(500).json({ message: 'ลบผู้ใช้ล้มเหลว', error: err.message });
   }
 };

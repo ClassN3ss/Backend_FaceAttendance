@@ -12,22 +12,22 @@ const { verifyToken } = require("../middleware/authMiddleware");
 const User = require('../models/User');
 const Class = require('../models/Class');
 
-// ✅ GET /teachers - รายชื่ออาจารย์
+// GET /teachers - รายชื่ออาจารย์
 router.get("/teachers", verifyToken, getTeachers);
 
-// ✅ GET /search/users?q=&role= - ค้นหาผู้ใช้
+// GET /search/users?q=&role= - ค้นหาผู้ใช้
 router.get("/search/users", verifyToken, searchUsers);
 
-// ✅ GET /users - ผู้ใช้ทั้งหมด (admin)
+// GET /users - ผู้ใช้ทั้งหมด (admin)
 router.get("/users", verifyToken, getAllUsers);
 
-// ✅ PUT /users/:id - แก้ไขข้อมูลผู้ใช้
+// PUT /users/:id - แก้ไขข้อมูลผู้ใช้
 router.put("/users/:id", verifyToken, updateUser);
 
-// ✅ DELETE /users/:id - ลบผู้ใช้
+// DELETE /users/:id - ลบผู้ใช้
 router.delete("/users/:id", verifyToken, deleteUser);
 
-// ✅ GET /with-classes - ผู้ใช้ทั้งหมด + คลาสที่เกี่ยวข้อง
+// GET /with-classes - ผู้ใช้ทั้งหมด + คลาสที่เกี่ยวข้อง
 router.get('/with-classes', verifyToken, async (req, res) => {
   try {
     const users = await User.find();

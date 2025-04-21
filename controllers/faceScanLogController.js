@@ -14,7 +14,7 @@ exports.getAllFaceScanLogs = async (req, res) => {
 
     res.json({ page, logs });
   } catch (err) {
-    console.error("❌ ดึงประวัติการสแกนล้มเหลว:", err);
-    res.status(500).json({ message: "❌ ไม่สามารถโหลดข้อมูลได้" });
+    console.error("ดึงประวัติการสแกนล้มเหลว:", err);
+    res.status(500).json({ message: "ไม่สามารถโหลดข้อมูลได้" });
   }
 };

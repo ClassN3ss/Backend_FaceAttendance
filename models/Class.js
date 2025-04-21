@@ -7,7 +7,7 @@ const classSchema = new mongoose.Schema({
     teacherId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true, },
     students: [ { type: mongoose.Schema.Types.ObjectId, ref: "User", }, ],
     attendanceTable: {
-      type: Map, // 🔐 date → [studentIds]
+      type: Map,
       of: [mongoose.Schema.Types.ObjectId],
       default: {},
     },
