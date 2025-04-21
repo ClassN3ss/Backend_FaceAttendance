@@ -12,34 +12,26 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 function cleanName(raw) {
   return raw
-    .replace(/ผู้สอน/g, '')
-    .replace(/อาจารย์/g, '')
-    .replace(/ดร\./g, '')
-    .replace(/ดร/g, '')
-    .replace(/ศ\./g, '')
+    .replace(/\b(ศ\.|รศ\.|ผศ\.|อ\.|ดร\.|อาจารย์|ศาสตราจารย์|รองศาสตราจารย์|ผู้ช่วยศาสตราจารย์|ผู้สอน)\b\s*/g, '')
     .trim();
-}
-
-function removeSectionFromCourseName(name) {
-  return name.replace(/ตอน\s*\d+/g, '').trim();
 }
 
 exports.createClass = [
   upload.single("file"),
   async (req, res) => {
     try {
-      const { email, section } = req.body;
+      const { email } = req.body;
       const file = req.file;
 
       if (!file || !email) {
         return res.status(400).json({ message: "กรุณาแนบไฟล์และอีเมลอาจารย์" });
       }
 
-      const { classDoc, newTeacherCreated } = await createClassFromXlsx(file.buffer, email, section || "1");
+      const { classDoc, newTeacherCreated } = await createClassFromXlsx(file.buffer, email);
 
       const message = newTeacherCreated
-        ? ` สร้างคลาสและเพิ่มอาจารย์ใหม่ (${email}) สำเร็จ`
-        : ` สร้างคลาสสำเร็จ`;
+        ? `สร้างคลาสและเพิ่มอาจารย์ใหม่ (${email}) สำเร็จ`
+        : `สร้างคลาสสำเร็จ`;
 
       res.json({ message, classId: classDoc._id });
     } catch (err) {
@@ -48,7 +40,7 @@ exports.createClass = [
   }
 ];
 
-async function createClassFromXlsx(buffer, email, section) {
+async function createClassFromXlsx(buffer, email) {
   const workbook = xlsx.read(buffer, { type: "buffer" });
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
   const rows = xlsx.utils.sheet_to_json(sheet, { header: 1 });
@@ -59,10 +51,14 @@ async function createClassFromXlsx(buffer, email, section) {
 
   const courseParts = courseRow[0].split(/\s+/);
   const courseCode = courseParts[1];
-  let courseName = courseParts.slice(2).join(" ");
-  courseName = removeSectionFromCourseName(courseName);
 
-  const sectionStr = String(section || "1");
+  let fullCourseName = courseParts.slice(2).join(" ");
+
+  const sectionMatch = fullCourseName.match(/ตอน\s*(\d+)/);
+  const sectionStr = sectionMatch ? sectionMatch[1] : "1";
+
+  const courseName = fullCourseName.replace(/ตอน\s*\d+/g, '').trim();
+
   const teacherName = cleanName(teacherRow[5]);
 
   let teacher = await User.findOne({ fullName: teacherName.trim(), role: "teacher" });
@@ -88,10 +84,14 @@ async function createClassFromXlsx(buffer, email, section) {
 
   const students = [];
   const seen = new Set();
+
   for (let i = 9; i < rows.length; i++) {
     const row = rows[i];
     const studentId = String(row[1] || "").trim();
     const fullName = String(row[2] || "").trim();
+
+    if (!studentId && !fullName) break;
+
     if (!studentId || !fullName || seen.has(studentId)) continue;
     seen.add(studentId);
 
