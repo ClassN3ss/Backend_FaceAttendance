@@ -58,15 +58,18 @@ exports.login = async (req, res) => {
     }
 
     // 🔍 ตรวจสอบว่า login ด้วยช่องที่เหมาะสมกับ role
-    if (user.role === "student" && user.studentId !== username) {
-      return res.status(401).json({ message: "นักศึกษาต้องใช้รหัสนักศึกษาในการเข้าสู่ระบบ" });
+    if (user.role === "student") {
+      const cleanStudentId = user.studentId.replace(/-/g, "");
+      if (cleanStudentId !== username) {
+        return res.status(401).json({ message: "นักศึกษาต้องใช้รหัสนักศึกษาในการเข้าสู่ระบบ" });
+      }
     }
 
     if (user.role === "teacher" && user.email !== username) {
       return res.status(401).json({ message: "อาจารย์ต้องใช้ Email ในการเข้าสู่ระบบ" });
     }
 
-    if (user.role === "admin" && user.studentId !== username && user.username !== username) {
+    if (user.role === "admin" && user.studentId.replace(/-/g, "") !== username && user.username !== username) {
       return res.status(401).json({ message: "ผู้ดูแลระบบต้องใช้ Username หรือรหัสนักศึกษา" });
     }
 
