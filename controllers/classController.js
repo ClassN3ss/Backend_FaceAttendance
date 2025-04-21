@@ -12,7 +12,7 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 function cleanName(raw) {
   return raw
-    .replace(/\b(ศ\.|รศ\.|ผศ\.|อ\.|ดร\.|อาจารย์|ศาสตราจารย์|รองศาสตราจารย์|ผู้ช่วยศาสตราจารย์|ผู้สอน)\b\s*/g, '')
+    .replace(/ผู้สอน/g, '')
     .trim();
 }
 
