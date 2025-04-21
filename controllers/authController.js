@@ -44,6 +44,7 @@ exports.login = async (req, res) => {
   try {
     const { username, password } = req.body;
 
+    // หาผู้ใช้จาก DB โดยพิจารณาทั้ง 3 ช่อง
     const user = await User.findOne({
       $or: [
         { username },
@@ -53,21 +54,37 @@ exports.login = async (req, res) => {
     });
 
     if (!user) {
-      return res.status(401).json({ message: "Invalid username or student ID or email" });
+      return res.status(401).json({ message: "ไม่พบผู้ใช้งานจากข้อมูลที่ให้มา" });
     }
 
+    // 🔍 ตรวจสอบว่า login ด้วยช่องที่เหมาะสมกับ role
+    if (user.role === "student" && user.studentId !== username) {
+      return res.status(401).json({ message: "นักศึกษาต้องใช้รหัสนักศึกษาในการเข้าสู่ระบบ" });
+    }
+
+    if (user.role === "teacher" && user.email !== username) {
+      return res.status(401).json({ message: "อาจารย์ต้องใช้ Email ในการเข้าสู่ระบบ" });
+    }
+
+    if (user.role === "admin" && user.studentId !== username && user.username !== username) {
+      return res.status(401).json({ message: "ผู้ดูแลระบบต้องใช้ Username หรือรหัสนักศึกษา" });
+    }
+
+    // ตรวจสอบรหัสผ่าน
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) {
-      return res.status(401).json({ message: "Invalid password" });
+      return res.status(401).json({ message: "รหัสผ่านไม่ถูกต้อง" });
     }
 
+    // สร้าง JWT Token
     const token = jwt.sign({ id: user._id, role: user.role }, config.jwt.secret, {
       expiresIn: config.jwt.expiresIn,
     });
 
     res.json({ token, user });
+
   } catch (err) {
-    res.status(500).json({ message: "Login error", error: err.message });
+    res.status(500).json({ message: "เกิดข้อผิดพลาดในการเข้าสู่ระบบ", error: err.message });
   }
 };
 
