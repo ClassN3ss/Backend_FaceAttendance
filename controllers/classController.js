@@ -82,45 +82,13 @@ async function createClassFromXlsx(buffer, email, section) {
     }
   }
 
-  // ✅ ค้นหา index ของ header ก่อน
-  const headerRowIndex = rows.findIndex(row =>
-    row.includes("ลำดับ") && row.includes("รหัสนักศึกษา") && row.includes("ชื่อ - สกุล")
-  );
-
-  if (headerRowIndex === -1) throw new Error("ไม่พบหัวตาราง 'ลำดับ', 'รหัสนักศึกษา', 'ชื่อ - สกุล'");
-
   const students = [];
   const seen = new Set();
-
-  let hasData = false;
-
-  for (let i = headerRowIndex + 1; i < rows.length; i++) {
+  for (let i = 9; i < rows.length; i++) {
     const row = rows[i];
-    const studentId = row[1]?.toString().trim();
-    const fullName = row[2]?.toString().trim();
-
-    const bothEmpty = (!studentId || studentId === "") && (!fullName || fullName === "");
-
-    if (i === headerRowIndex + 1 && bothEmpty) {
-      throw new Error(`แถวแรกหลัง header ว่างเปล่า กรุณาอัปโหลดไฟล์ใหม่`);
-    }
-
-    if (bothEmpty) {
-      // ตรวจดูแถวถัดไปทั้งหมดจนสุดว่ามีข้อมูลไหม
-      const restHasData = rows.slice(i + 1, 100).some(r => {
-        const sid = r[1]?.toString().trim();
-        const name = r[2]?.toString().trim();
-        return sid || name;
-      });
-      if (!restHasData) break; // ✅ จบ loop อย่างปลอดภัย
-      else continue;
-    }
-
-    if (!studentId || !fullName) {
-      throw new Error(`ข้อมูลไม่ครบในแถวที่ ${i + 1} กรุณาอัปโหลดไฟล์ใหม่`);
-    }
-
-    if (seen.has(studentId)) continue;
+    const studentId = String(row[1] || "").trim();
+    const fullName = String(row[2] || "").trim();
+    if (!studentId || !fullName || seen.has(studentId)) continue;
     seen.add(studentId);
 
     const studentEmail = `s${studentId}@email.kmutnb.ac.th`;
@@ -144,10 +112,9 @@ async function createClassFromXlsx(buffer, email, section) {
     }
 
     students.push(user._id);
-    hasData = true;
   }
 
-  if (!hasData || students.length === 0) throw new Error("ไม่พบนักศึกษาในไฟล์");
+  if (students.length === 0) throw new Error("ไม่พบนักศึกษาในไฟล์");
 
   let classDoc = await Class.findOne({ courseCode, section: sectionStr });
   if (classDoc) {
