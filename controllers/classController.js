@@ -20,6 +20,7 @@ function removeSectionFromCourseName(name) {
   return name.replace(/ตอน\s*\d+/g, '').trim();
 }
 
+// ✅ สร้างคลาสจากไฟล์ Excel
 exports.createClass = [
   upload.single("file"),
   async (req, res) => {
@@ -28,22 +29,23 @@ exports.createClass = [
       const file = req.file;
 
       if (!file || !email) {
-        return res.status(400).json({ message: "กรุณาแนบไฟล์และอีเมลอาจารย์" });
+        return res.status(400).json({ message: "❌ กรุณาแนบไฟล์และอีเมลอาจารย์" });
       }
 
       const { classDoc, newTeacherCreated } = await createClassFromXlsx(file.buffer, email, section || "1");
 
       const message = newTeacherCreated
-        ? ` สร้างคลาสและเพิ่มอาจารย์ใหม่ (${email}) สำเร็จ`
-        : ` สร้างคลาสสำเร็จ`;
+        ? `✅ สร้างคลาสและเพิ่มอาจารย์ใหม่ (${email}) สำเร็จ`
+        : `✅ สร้างคลาสสำเร็จ`;
 
       res.json({ message, classId: classDoc._id });
     } catch (err) {
-      res.status(500).json({ message: err.message || "เกิดข้อผิดพลาด" });
+      res.status(500).json({ message: err.message || "❌ เกิดข้อผิดพลาด" });
     }
   }
 ];
 
+// ✅ Internal: อ่านข้อมูลจากไฟล์ Excel และสร้างคลาส
 async function createClassFromXlsx(buffer, email, section) {
   const workbook = xlsx.read(buffer, { type: "buffer" });
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
@@ -51,7 +53,7 @@ async function createClassFromXlsx(buffer, email, section) {
 
   const courseRow = rows.find(r => r?.[0]?.toString().includes("วิชา"));
   const teacherRow = rows.find(r => r?.[5]?.toString().includes("ผู้สอน"));
-  if (!courseRow || !teacherRow) throw new Error("ไม่พบข้อมูลวิชา หรือ ผู้สอนในไฟล์");
+  if (!courseRow || !teacherRow) throw new Error("❌ ไม่พบข้อมูลวิชา หรือ ผู้สอนในไฟล์");
 
   const courseParts = courseRow[0].split(/\s+/);
   const courseCode = courseParts[1];
@@ -114,7 +116,7 @@ async function createClassFromXlsx(buffer, email, section) {
     students.push(user._id);
   }
 
-  if (students.length === 0) throw new Error("ไม่พบนักศึกษาในไฟล์");
+  if (students.length === 0) throw new Error("❌ ไม่พบนักศึกษาในไฟล์");
 
   let classDoc = await Class.findOne({ courseCode, section: sectionStr });
   if (classDoc) {
@@ -135,6 +137,7 @@ async function createClassFromXlsx(buffer, email, section) {
   return { classDoc, newTeacherCreated };
 }
 
+// ✅ GET /classes
 exports.getAllClasses = async (req, res) => {
   try {
     const classes = await Class.find()
@@ -142,39 +145,43 @@ exports.getAllClasses = async (req, res) => {
       .populate("students", "fullName email username");
     res.json(classes);
   } catch (err) {
-    res.status(500).json({ message: "ดึงข้อมูลคลาสล้มเหลว", error: err.message });
+    res.status(500).json({ message: "❌ ดึงข้อมูลคลาสล้มเหลว", error: err.message });
   }
 };
 
+// ✅ GET /classes/:id
 exports.getClassById = async (req, res) => {
   try {
     const cls = await Class.findById(req.params.id)
       .populate("teacherId", "fullName email")
       .populate("students", "fullName studentId email");
 
-    if (!cls) return res.status(404).json({ message: "ไม่พบคลาสนี้" });
+    if (!cls) return res.status(404).json({ message: "❌ ไม่พบคลาสนี้" });
     res.json(cls);
   } catch (err) {
-    res.status(500).json({ message: "โหลดคลาสล้มเหลว", error: err.message });
+    res.status(500).json({ message: "❌ โหลดคลาสล้มเหลว", error: err.message });
   }
 };
 
+// ✅ DELETE /classes/:id
 exports.deleteClass = async (req, res) => {
   try {
     const deleted = await Class.findByIdAndDelete(req.params.id);
-    if (!deleted) return res.status(404).json({ message: "ไม่พบคลาส" });
+    if (!deleted) return res.status(404).json({ message: "❌ ไม่พบคลาส" });
 
+    // ✅ เพิ่มตรงนี้: ลบ Enroll ที่ชี้มาคลาสนี้
     await Enroll.deleteMany({ classId: req.params.id });
     await Attendance.deleteMany({ classId: req.params.id });
     await FaceScanLog.deleteMany({ classId: req.params.id });
     await EnrollmentRequest.deleteMany({ classId: req.params.id });
 
-    res.json({ message: "ลบคลาสแล้ว และลบการลงทะเบียนของคลาสนี้เรียบร้อย" });
+    res.json({ message: "✅ ลบคลาสแล้ว และลบการลงทะเบียนของคลาสนี้เรียบร้อย" });
   } catch (err) {
-    res.status(500).json({ message: "ลบคลาสล้มเหลว", error: err.message });
+    res.status(500).json({ message: "❌ ลบคลาสล้มเหลว", error: err.message });
   }
 };
 
+// ✅ GET /classes/student/:id
 exports.getClassesByStudent = async (req, res) => {
   try {
     const studentId = req.params.id;
@@ -184,15 +191,16 @@ exports.getClassesByStudent = async (req, res) => {
       .select("courseCode courseName section");
     res.json(classes);
   } catch (err) {
-    res.status(500).json({ message: "โหลดคลาสของนักศึกษาล้มเหลว", error: err.message });
+    res.status(500).json({ message: "❌ โหลดคลาสของนักศึกษาล้มเหลว", error: err.message });
   }
 };
 
+// ✅ GET /classes/teacher
 exports.getClassesByTeacher = async (req, res) => {
   try {
     const classes = await Class.find({ teacherId: req.user._id });
     res.json(classes);
   } catch (err) {
-    res.status(500).json({ message: "โหลดคลาสของอาจารย์ล้มเหลว", error: err.message });
+    res.status(500).json({ message: "❌ โหลดคลาสของอาจารย์ล้มเหลว", error: err.message });
   }
 };
