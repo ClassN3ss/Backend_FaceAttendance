@@ -97,7 +97,7 @@ async function createClassFromXlsx(buffer, email, section) {
     if (!studentId || !fullName || seen.has(studentId)) continue;
     seen.add(studentId);
 
-    const studentEmail = `s${studentId}@kmutnb.ac.th`;
+    const studentEmail = `s${studentId}@email.kmutnb.ac.th`;
     let user = await User.findOne({ studentId });
 
     if (!user) {
