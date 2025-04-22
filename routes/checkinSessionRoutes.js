@@ -12,7 +12,7 @@ router.put("/cancel/:id", verifyToken, isTeacher, cancelSession);
 // โหลดทุก session ที่เปิดอยู่ (admin/teacher)
 router.get("/current", verifyToken, getActiveSessions);
 
-// 🔥 path สั้น ไม่ซ้ำ ใช้สำหรับ student ดู session ของห้องตัวเอง
+// student ดู session ของห้องตัวเอง
 router.get("/class/:classId", verifyToken, getActiveSessionByClass);
 
 module.exports = router;
