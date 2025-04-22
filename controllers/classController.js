@@ -101,7 +101,7 @@ async function createClassFromXlsx(buffer, email) {
   const students = [];
   const seen = new Set();
 
-  for (let i = 7; i < rows.length; i++) {
+  for (let i = 8; i < rows.length; i++) {
     const row = rows[i];
     const rawId = String(row[1] || "").trim();
     const emailId = rawId.replace(/-/g, "");
