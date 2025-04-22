@@ -105,6 +105,7 @@ async function createClassFromXlsx(buffer, email) {
     const row = rows[i];
     const rawId = String(row[1] || "").trim();
     const emailId = rawId.replace(/-/g, "");
+    const usernameId = rawId.replace(/-/g, "");
     const fullName = String(row[2] || "").trim();
 
     if (!rawId && !fullName) {
@@ -127,7 +128,7 @@ async function createClassFromXlsx(buffer, email) {
       const hashed = await bcrypt.hash(rawId, 10);
       user = await User.create({
         studentId: rawId,
-        username: rawId,
+        username: usernameId,
         fullName,
         email: studentEmail,
         password_hash: hashed,
