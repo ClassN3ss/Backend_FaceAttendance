@@ -51,20 +51,24 @@ async function createClassFromXlsx(buffer, email) {
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
   const rows = xlsx.utils.sheet_to_json(sheet, { header: 1 });
 
+  // ตรวจสอบว่าหัวคอลัมน์ตรงเงื่อนไข (ที่แถว index 6)
+  const headerRow = rows[6];
+  if (!headerRow || !headerRow[1]?.toString().includes("เลข") || !headerRow[2]?.toString().includes("ชื่อ")) {
+    throw new Error(`❌ รูปแบบไฟล์ไม่ถูกต้อง: ไม่พบหัวคอลัมน์ "เลข" หรือ "ชื่อ - สกุล" ที่แถวที่ 8`);
+  }
+
   const courseRow = rows.find(r => r?.[0]?.toString().includes("วิชา"));
   const teacherRow = rows.find(r => r?.[5]?.toString().includes("ผู้สอน"));
   if (!courseRow || !teacherRow) throw new Error("❌ ไม่พบข้อมูลวิชา หรือ ผู้สอนในไฟล์");
 
   const courseParts = courseRow[0].split(/\s+/);
   const courseCode = courseParts[1];
-
   let fullCourseName = courseParts.slice(2).join(" ");
   const sectionMatch = fullCourseName.match(/ตอน\s*(\d+)/);
   const sectionStr = sectionMatch ? sectionMatch[1] : "1";
-  const courseName = fullCourseName.replace(/ตอน\s*\d+/, '').trim();
+  const courseName = fullCourseName.replace(/ตอน\s*\d+/, "").trim();
 
   const teacherName = cleanName(teacherRow[5]);
-
   let teacher = await User.findOne({ fullName: teacherName.trim(), role: "teacher" });
   let newTeacherCreated = false;
 
@@ -75,30 +79,28 @@ async function createClassFromXlsx(buffer, email) {
       fullName: teacherName.trim(),
       email: email.trim(),
       password_hash: hashed,
-      role: "teacher"
+      role: "teacher",
     });
     newTeacherCreated = true;
   } else {
-    if (teacher.email !== email.trim()) {
-      teacher.email = email.trim();
-      teacher.username = email.trim();
-      await teacher.save();
-    }
+    // ✅ อัปเดต email/username เสมอ
+    teacher.email = email.trim();
+    teacher.username = email.trim();
+    await teacher.save();
   }
 
   const students = [];
   const seen = new Set();
-  for (let i = 8; i < rows.length; i++) {
+
+  for (let i = 7; i < rows.length; i++) {
     const row = rows[i];
-    const rawId = String(row[1] || "").trim();     // รหัสที่มีขีด เช่น 64-040626-3635-8
-    const emailId = rawId.replace(/-/g, "");        // ลบขีดออก เช่น 6404062636358
+    const rawId = String(row[1] || "").trim();
+    const emailId = rawId.replace(/-/g, "");
     const fullName = String(row[2] || "").trim();
 
     if (!rawId && !fullName) {
       const hasMore = rows.slice(i + 1).some(r => (r[1]?.toString().trim() || r[2]?.toString().trim()));
-      if (hasMore) {
-        throw new Error(`❌ พบแถวว่างก่อนจบรายชื่อ (แถวที่ ${i + 1})`);
-      }
+      if (hasMore) throw new Error(`❌ พบแถวว่างก่อนจบรายชื่อ (แถวที่ ${i + 1})`);
       break;
     }
 
@@ -110,18 +112,17 @@ async function createClassFromXlsx(buffer, email) {
     seen.add(rawId);
 
     const studentEmail = `s${emailId}@email.kmutnb.ac.th`;
-
     let user = await User.findOne({ studentId: rawId });
 
     if (!user) {
       const hashed = await bcrypt.hash(rawId, 10);
       user = await User.create({
-        studentId: rawId,             // ✔️ เก็บแบบมีขีด
+        studentId: rawId,
         username: rawId,
         fullName,
-        email: studentEmail,          // ✔️ ใช้แบบไม่มีขีด
+        email: studentEmail,
         password_hash: hashed,
-        role: "student"
+        role: "student",
       });
     } else {
       if (user.fullName !== fullName) {
@@ -147,7 +148,7 @@ async function createClassFromXlsx(buffer, email) {
       courseName,
       section: sectionStr,
       teacherId: teacher._id,
-      students
+      students,
     });
   }
 
