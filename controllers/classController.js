@@ -51,64 +51,65 @@ async function createClassFromXlsx(buffer, email) {
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
   const rows = xlsx.utils.sheet_to_json(sheet, { header: 1 });
 
+  // ✅ ตรวจสอบหัวตารางว่ามีคำว่า "เลข" และ "ชื่อ"
+  const headerRow = rows[6];
+  if (!headerRow || !headerRow[1]?.toString().includes("เลข") || !headerRow[2]?.toString().includes("ชื่อ")) {
+    throw new Error(`❌ รูปแบบไฟล์ไม่ถูกต้อง: ไม่พบหัวคอลัมน์ "เลข" หรือ "ชื่อ - สกุล" ที่แถวที่ 8`);
+  }
+
   const courseRow = rows.find(r => r?.[0]?.toString().includes("วิชา"));
   const teacherRow = rows.find(r => r?.[5]?.toString().includes("ผู้สอน"));
   if (!courseRow || !teacherRow) throw new Error("❌ ไม่พบข้อมูลวิชา หรือ ผู้สอนในไฟล์");
 
   const courseParts = courseRow[0].split(/\s+/);
   const courseCode = courseParts[1];
-
-  let fullCourseName = courseParts.slice(2).join(" ");
+  const fullCourseName = courseParts.slice(2).join(" ");
   const sectionMatch = fullCourseName.match(/ตอน\s*(\d+)/);
   const sectionStr = sectionMatch ? sectionMatch[1] : "1";
   const courseName = fullCourseName.replace(/ตอน\s*\d+/, '').trim();
 
   const teacherName = cleanName(teacherRow[5]);
+  const newEmail = email.trim();
+  let newTeacherCreated = false;
 
+  // ✅ ค้นหาหรือสร้างอาจารย์
   let teacher = await User.findOne({ fullName: teacherName.trim(), role: "teacher" });
-
   if (!teacher) {
-    const existingEmailUser = await User.findOne({ username: email.trim() });
-    if (existingEmailUser) {
-      throw new Error(`❌ Email นี้ถูกใช้แล้ว (${email.trim()})`);
-    }
-  
     const hashed = await bcrypt.hash("teacher123", 10);
     teacher = await User.create({
-      username: email.trim(),
+      username: newEmail,
       fullName: teacherName.trim(),
-      email: email.trim(),
+      email: newEmail,
       password_hash: hashed,
-      role: "teacher",
+      role: "teacher"
     });
+    newTeacherCreated = true;
   } else {
-    // ✅ กรณี fullName ตรง แต่ username/email ไม่ตรง → อัปเดตแบบไม่ชน key
-    if (teacher.username !== email.trim()) {
-      const existingUser = await User.findOne({ username: email.trim() });
-      if (existingUser && existingUser._id.toString() !== teacher._id.toString()) {
-        throw new Error(`❌ Email นี้ถูกใช้แล้วกับผู้ใช้งานอื่น (${email.trim()})`);
+    // ✅ ตรวจสอบว่ามีคนอื่นใช้ username/email นี้อยู่หรือไม่
+    if (teacher.email !== newEmail || teacher.username !== newEmail) {
+      const existing = await User.findOne({ username: newEmail });
+      if (existing && existing._id.toString() !== teacher._id.toString()) {
+        throw new Error(`❌ Email นี้ถูกใช้แล้วกับผู้ใช้งานอื่น (${newEmail})`);
       }
-  
-      teacher.username = email.trim();
-      teacher.email = email.trim();
+      teacher.email = newEmail;
+      teacher.username = newEmail;
       await teacher.save();
     }
   }
-  
 
+  // ✅ ประมวลผลนักศึกษา
   const students = [];
   const seen = new Set();
-  for (let i = 8; i < rows.length; i++) {
+
+  for (let i = 7; i < rows.length; i++) {
     const row = rows[i];
-    const rawId = String(row[1] || "").trim();     // รหัสที่มีขีด เช่น 64-040626-3635-8
-    const emailId = rawId.replace(/-/g, "");        // ลบขีดออก เช่น 6404062636358
+    const rawId = String(row[1] || "").trim();
+    const emailId = rawId.replace(/-/g, "");
     const fullName = String(row[2] || "").trim();
 
     if (!rawId && !fullName) {
       const hasMore = rows.slice(i + 1).some(r => (r[1]?.toString().trim() || r[2]?.toString().trim()));
-      if (hasMore) {
-        throw new Error(`❌ พบแถวว่างก่อนจบรายชื่อ (แถวที่ ${i + 1})`);
-      }
+      if (hasMore) throw new Error(`❌ พบแถวว่างก่อนจบรายชื่อ (แถวที่ ${i + 1})`);
       break;
     }
 
@@ -120,16 +121,15 @@ async function createClassFromXlsx(buffer, email) {
     seen.add(rawId);
 
     const studentEmail = `s${emailId}@email.kmutnb.ac.th`;
-
     let user = await User.findOne({ studentId: rawId });
 
     if (!user) {
       const hashed = await bcrypt.hash(rawId, 10);
       user = await User.create({
-        studentId: rawId,             // ✔️ เก็บแบบมีขีด
+        studentId: rawId,
         username: rawId,
         fullName,
-        email: studentEmail,          // ✔️ ใช้แบบไม่มีขีด
+        email: studentEmail,
         password_hash: hashed,
         role: "student"
       });
@@ -145,6 +145,7 @@ async function createClassFromXlsx(buffer, email) {
 
   if (students.length === 0) throw new Error("❌ ไม่พบนักศึกษาในไฟล์");
 
+  // ✅ ค้นหาหรือสร้างคลาส
   let classDoc = await Class.findOne({ courseCode, section: sectionStr });
   if (classDoc) {
     classDoc.courseName = courseName;
