@@ -91,28 +91,6 @@ exports.login = async (req, res) => {
   }
 };
 
-// อัปเดตใบหน้าและส่ง studentId + fullName กลับ
-exports.uploadFace = async (req, res) => {
-  try {
-    const { faceDescriptor } = req.body;
-
-    const user = await User.findById(req.user.id);
-    if (!user) return res.status(404).json({ message: "User not found" });
-
-    user.faceScanned = true;
-    user.faceDescriptor = faceDescriptor;
-    await user.save();
-
-    res.json({
-      message: "Face saved successfully!",
-      studentId: user.studentId,
-      fullName: user.fullName
-    });
-  } catch (err) {
-    res.status(500).json({ message: "Face upload failed", error: err.message });
-  }
-};
-
 // ตรวจสอบใบหน้าอาจารย์ก่อนให้นักศึกษาเช็คชื่อ
 exports.verifyTeacherFace = async (req, res) => {
   try {
