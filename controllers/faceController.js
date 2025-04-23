@@ -53,16 +53,13 @@ exports.verifyTeacherFace = async (req, res) => {
       return res.status(403).json({ message: "คุณไม่ใช่อาจารย์ หรือยังไม่บันทึกใบหน้า" });
     }
 
-    const distance = faceapi.euclideanDistance(
-      Float32Array.from(faceDescriptor),
-      Float32Array.from(teacher.faceDescriptor)
-    );
+    const distance = cosineDistance(faceDescriptor, teacher.faceDescriptor);
 
     if (distance > 0.5) {
       return res.status(403).json({ message: "ใบหน้าไม่ตรงกับอาจารย์" });
     }
 
-    teacher.lastVerifiedAt = new Date();
+    teacher.lastVerifiedAt = new Date(); // (Optional) สำหรับบันทึกเวลา
     await teacher.save();
 
     res.json({ message: "ใบหน้าอาจารย์ถูกต้อง", distance: distance.toFixed(4) });
