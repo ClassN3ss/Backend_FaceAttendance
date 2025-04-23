@@ -21,7 +21,12 @@ const verifyToken = async (req, res, next) => {
       return res.status(404).json({ message: "User not found" });
     }
 
-    req.user = user;
+    req.user = {
+      id: user._id.toString(),  // ✅ เพิ่มตรงนี้ให้แน่ใจว่า .id ใช้ได้ใน multer
+      role: user.role,
+      fullName: user.fullName,
+      email: user.email,
+    };
     next();
   } catch (err) {
     console.log("[middleware] Token ไม่ถูกต้อง:", err.message);

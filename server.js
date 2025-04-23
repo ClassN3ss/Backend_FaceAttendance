@@ -41,6 +41,10 @@ app.use(morgan("dev"));
 const connectDB = require("./configuration/database/db");
 connectDB();
 
+app.use((req, res, next) => {
+  console.log(`🌐 Incoming Request: [${req.method}] ${req.originalUrl}`);
+  next();
+});
 app.use("/auth", authRoutes);
 
 app.use("/api/students", faceRoutes);

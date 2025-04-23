@@ -91,26 +91,47 @@ exports.login = async (req, res) => {
   }
 };
 
-// อัปเดตใบหน้าและส่ง studentId + fullName กลับ
-exports.uploadFace = async (req, res) => {
-  try {
-    const { faceDescriptor } = req.body;
-
-    const user = await User.findById(req.user.id);
-    if (!user) return res.status(404).json({ message: "User not found" });
-
-    user.faceScanned = true;
-    user.faceDescriptor = faceDescriptor;
-    await user.save();
-
-    res.json({
-      message: "Face saved successfully!",
-      studentId: user.studentId,
-      fullName: user.fullName
-    });
-  } catch (err) {
-    res.status(500).json({ message: "Face upload failed", error: err.message });
+function euclideanDistance(desc1, desc2) {
+  let sum = 0;
+  for (let i = 0; i < desc1.length; i++) {
+    const diff = desc1[i] - desc2[i];
+    sum += diff * diff;
   }
+  return Math.sqrt(sum);
+}
+
+// อัปเดตใบหน้าและส่ง studentId + fullName กลับ
+exports.uploadFace = (req, res) => {
+  upload(req, res, async function (err) {
+    if (err) return res.status(500).json({ message: "อัปโหลดภาพล้มเหลว", error: err.message });
+
+    try {
+      const user = await User.findById(req.user.id);
+      if (!user) return res.status(404).json({ message: "ไม่พบผู้ใช้" });
+
+      if (req.body.faceDescriptor && !req.file) {
+        const inputDescriptor = Float32Array.from(JSON.parse(req.body.faceDescriptor));
+        const savedDescriptor = Float32Array.from(user.faceDescriptor);
+
+        const distance = faceapi.euclideanDistance(savedDescriptor, inputDescriptor);
+        console.log("📏 ค่าระยะห่างใบหน้า (euclidean distance):", distance.toFixed(6)); // ✅ log ค่า
+
+        if (distance > 0.5) {
+          return res.status(403).json({ message: `❌ ใบหน้าไม่ตรงกัน (ระยะห่าง ${distance.toFixed(4)})` });
+        }
+
+        return res.json({
+          message: `✅ ใบหน้าตรงกัน (ระยะห่าง ${distance.toFixed(4)})`,
+          studentId: user.studentId,
+          fullName: user.fullName,
+        });
+      }
+
+      return res.status(400).json({ message: "ไม่ได้ส่ง faceDescriptor" });
+    } catch (err) {
+      res.status(500).json({ message: "เกิดข้อผิดพลาด", error: err.message });
+    }
+  });
 };
 
 // ตรวจสอบใบหน้าอาจารย์ก่อนให้นักศึกษาเช็คชื่อ
