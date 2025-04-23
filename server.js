@@ -65,7 +65,7 @@ app.post("/verify-face", upload.single("file"), (req, res) => {
 
   res.status(200).json({
     studentId: userId,
-    fullName: "Mock Student",
+    fullName: "นิกิ ใจดี",
     faceDescriptor: [0.1, 0.2, 0.3]
   });
 });
