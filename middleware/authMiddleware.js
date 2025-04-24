@@ -22,7 +22,7 @@ const verifyToken = async (req, res, next) => {
     }
 
     req.user = {
-      id: user._id.toString(),  // ✅ เพิ่มตรงนี้ให้แน่ใจว่า .id ใช้ได้ใน multer
+      _id: user._id,              // ✅ ใช้ _id แทน id
       role: user.role,
       fullName: user.fullName,
       email: user.email,
