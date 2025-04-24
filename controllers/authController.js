@@ -4,7 +4,6 @@ const jwt = require("jsonwebtoken");
 const config = require("../configuration/config");
 const faceapi = require("face-api.js");
 const Class = require("../models/Class");
-const faceapi = require("face-api.js");
 
 // นักศึกษาลงทะเบียนจากข้อมูลที่มีอยู่
 exports.register = async (req, res) => {
@@ -93,43 +92,25 @@ exports.login = async (req, res) => {
 };
 
 // อัปเดตใบหน้าและส่ง studentId + fullName กลับ
-exports.uploadFace = (req, res) => {
-  upload(req, res, async function (err) {
-    if (err) return res.status(500).json({ message: "อัปโหลดภาพล้มเหลว", error: err.message });
+exports.uploadFace = async (req, res) => {
+  try {
+    const { faceDescriptor } = req.body;
 
-    try {
-      const user = await User.findById(req.user.id);
-      if (!user) return res.status(404).json({ message: "ไม่พบผู้ใช้" });
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: "User not found" });
 
-      // ✅ ตรวจสอบว่า faceDescriptor ถูกส่งมา
-      if (!req.body.faceDescriptor) {
-        return res.status(400).json({ message: "ไม่ได้ส่ง faceDescriptor มา" });
-      }
+    user.faceScanned = true;
+    user.faceDescriptor = faceDescriptor;
+    await user.save();
 
-      const inputDescriptor = Float32Array.from(JSON.parse(req.body.faceDescriptor));
-
-      // ✅ ถ้ายังไม่เคยบันทึกใบหน้า
-      if (!user.faceDescriptor) {
-        return res.status(403).json({ message: "ยังไม่มีการลงทะเบียนใบหน้า" });
-      }
-
-      const savedDescriptor = Float32Array.from(user.faceDescriptor);
-      const distance = faceapi.euclideanDistance(savedDescriptor, inputDescriptor);
-      console.log("📏 ระยะห่างใบหน้า:", distance);
-
-      if (distance > 0.4) {
-        return res.status(403).json({ message: "ใบหน้าไม่ตรงกับผู้ใช้ที่เข้าสู่ระบบ" });
-      }
-
-      return res.json({
-        message: "Face matched!",
-        studentId: user.studentId,
-        fullName: user.fullName,
-      });
-    } catch (err) {
-      return res.status(500).json({ message: "เกิดข้อผิดพลาด", error: err.message });
-    }
-  });
+    res.json({
+      message: "Face saved successfully!",
+      studentId: user.studentId,
+      fullName: user.fullName
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Face upload failed", error: err.message });
+  }
 };
 
 // ตรวจสอบใบหน้าอาจารย์ก่อนให้นักศึกษาเช็คชื่อ
