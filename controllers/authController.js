@@ -84,57 +84,35 @@ function euclideanDistance(desc1, desc2) {
   return Math.sqrt(sum);
 }
 
-exports.uploadFace = (req, res) => {
-  upload(req, res, async function (err) {
-    if (err) return res.status(500).json({ message: "อัปโหลดภาพล้มเหลว", error: err.message });
+exports.uploadFace = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ message: "ไม่พบผู้ใช้" });
 
-    try {
-      const user = await User.findById(req.user.id);
-      if (!user) return res.status(404).json({ message: "ไม่พบผู้ใช้" });
-
-      if (req.body.faceDescriptor && !req.file) {
-        const inputDescriptor = Float32Array.from(JSON.parse(req.body.faceDescriptor));
-        const savedDescriptor = Float32Array.from(user.faceDescriptor);
-
-        const distance = euclideanDistance(savedDescriptor, inputDescriptor);
-        console.log("📏 ค่าระยะห่างใบหน้า (euclidean distance):", distance.toFixed(6));
-
-        if (distance > 0.5) {
-          return res.status(403).json({ message: `❌ ใบหน้าไม่ตรงกัน (ระยะห่าง ${distance.toFixed(4)})` });
-        }
-
-        return res.json({
-          message: `✅ ใบหน้าตรงกัน (ระยะห่าง ${distance.toFixed(4)})`,
-          studentId: user.studentId,
-          fullName: user.fullName,
-        });
-      }
-
-      if (req.file && req.body.faceDescriptor) {
-        const faceDescriptor = JSON.parse(req.body.faceDescriptor);
-        user.faceDescriptor = faceDescriptor;
-        user.faceScanned = true;
-        await user.markModified("faceDescriptor");
-        await user.save();
-
-        return res.json({
-          message: "✅ บันทึกใบหน้าและอัปโหลดรูปสำเร็จ!",
-          studentId: user.studentId,
-          fullName: user.fullName,
-          imagePath: req.file.path,
-        });
-      }
-
-      if (req.file && !req.body.faceDescriptor) {
-        return res.json({ message: "✅ อัปโหลดเฉพาะรูปภาพสำเร็จ", imagePath: req.file.path });
-      }
-
-      return res.status(400).json({ message: "❌ ไม่ได้ส่งข้อมูลที่ต้องการ" });
-    } catch (err) {
-      console.error("❌ เกิดข้อผิดพลาดใน uploadFace:", err);
-      res.status(500).json({ message: "เกิดข้อผิดพลาด", error: err.message });
+    if (!req.body.faceDescriptor) {
+      return res.status(400).json({ message: "❌ ไม่ได้ส่ง faceDescriptor มา" });
     }
-  });
+
+    const inputDescriptor = Float32Array.from(JSON.parse(req.body.faceDescriptor));
+    const savedDescriptor = Float32Array.from(user.faceDescriptor);
+
+    const distance = euclideanDistance(savedDescriptor, inputDescriptor);
+    console.log("📏 ค่าระยะห่างใบหน้า (euclidean distance):", distance.toFixed(6));
+
+    if (distance > 0.5) {
+      return res.status(403).json({ message: `❌ ใบหน้าไม่ตรงกัน (ระยะห่าง ${distance.toFixed(4)})` });
+    }
+
+    return res.json({
+      message: `✅ ใบหน้าตรงกัน (ระยะห่าง ${distance.toFixed(4)})`,
+      studentId: user.studentId,
+      fullName: user.fullName,
+    });
+
+  } catch (err) {
+    console.error("❌ เกิดข้อผิดพลาดใน uploadFace:", err);
+    res.status(500).json({ message: "เกิดข้อผิดพลาด", error: err.message });
+  }
 };
 
 exports.verifyTeacherFace = async (req, res) => {
