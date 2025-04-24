@@ -2,6 +2,7 @@ const User = require("../models/User");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const config = require("../configuration/config");
+const faceapi = require("face-api.js");
 const Class = require("../models/Class");
 
 // นักศึกษาลงทะเบียนจากข้อมูลที่มีอยู่
@@ -12,17 +13,21 @@ exports.register = async (req, res) => {
     const foundById = await User.findOne({ studentId });
     const foundByName = await User.findOne({ fullName });
 
+    // ไม่เจอทั้งชื่อและรหัส
     if (!foundById && !foundByName) {
       return res.status(404).json({ message: "ไม่พบชื่อและรหัสในระบบ ต้องการลงทะเบียนใหม่หรือไม่?" });
     }
 
+    // อย่างใดอย่างหนึ่งไม่ตรง
     if (!foundById || !foundByName) {
       return res.status(400).json({ message: "ข้อมูลบางส่วนไม่ตรงกับระบบ กรุณาตรวจสอบให้ครบ" });
     }
 
-    const strippedId = studentId.replace(/-/g, "");
+    // ทั้งชื่อและรหัสตรงกัน
+    const strippedId = studentId.replace(/-/g, ""); // ตัดขีดออก
+
     const username = strippedId;
-    const password_hash = await bcrypt.hash(strippedId, 10);
+    const password_hash = await bcrypt.hash(strippedId, 10); // เข้ารหัสแบบไม่มีขีด
 
     foundById.username = username;
     foundById.password_hash = password_hash;
@@ -34,9 +39,12 @@ exports.register = async (req, res) => {
   }
 };
 
+// Login โดยใช้ username หรือ studentId หรือ email
 exports.login = async (req, res) => {
   try {
     const { username, password } = req.body;
+
+    // หาผู้ใช้จาก DB โดยพิจารณาทั้ง 3 ช่อง
     const user = await User.findOne({
       $or: [
         { username },
@@ -45,8 +53,11 @@ exports.login = async (req, res) => {
       ]
     });
 
-    if (!user) return res.status(401).json({ message: "ไม่พบผู้ใช้งานจากข้อมูลที่ให้มา" });
+    if (!user) {
+      return res.status(401).json({ message: "ไม่พบผู้ใช้งานจากข้อมูลที่ให้มา" });
+    }
 
+    // ตรวจสอบว่า login ด้วยช่องที่เหมาะสมกับ role
     if (user.role === "student") {
       const cleanStudentId = user.studentId.replace(/-/g, "");
       if (cleanStudentId !== username) {
@@ -62,59 +73,47 @@ exports.login = async (req, res) => {
       return res.status(401).json({ message: "ผู้ดูแลระบบต้องใช้ Username หรือรหัสนักศึกษา" });
     }
 
+    // ตรวจสอบรหัสผ่าน
     const valid = await bcrypt.compare(password, user.password_hash);
-    if (!valid) return res.status(401).json({ message: "รหัสผ่านไม่ถูกต้อง" });
+    if (!valid) {
+      return res.status(401).json({ message: "รหัสผ่านไม่ถูกต้อง" });
+    }
 
+    // สร้าง JWT Token
     const token = jwt.sign({ id: user._id, role: user.role }, config.jwt.secret, {
       expiresIn: config.jwt.expiresIn,
     });
 
     res.json({ token, user });
+
   } catch (err) {
     res.status(500).json({ message: "เกิดข้อผิดพลาดในการเข้าสู่ระบบ", error: err.message });
   }
 };
 
-function euclideanDistance(desc1, desc2) {
-  let sum = 0;
-  for (let i = 0; i < desc1.length; i++) {
-    const diff = desc1[i] - desc2[i];
-    sum += diff * diff;
-  }
-  return Math.sqrt(sum);
-}
-
+// อัปเดตใบหน้าและส่ง studentId + fullName กลับ
 exports.uploadFace = async (req, res) => {
   try {
+    const { faceDescriptor } = req.body;
+
     const user = await User.findById(req.user.id);
-    if (!user) return res.status(404).json({ message: "ไม่พบผู้ใช้" });
+    if (!user) return res.status(404).json({ message: "User not found" });
 
-    if (!req.body.faceDescriptor) {
-      return res.status(400).json({ message: "❌ ไม่ได้ส่ง faceDescriptor มา" });
-    }
+    user.faceScanned = true;
+    user.faceDescriptor = faceDescriptor;
+    await user.save();
 
-    const inputDescriptor = Float32Array.from(JSON.parse(req.body.faceDescriptor));
-    const savedDescriptor = Float32Array.from(user.faceDescriptor);
-
-    const distance = euclideanDistance(savedDescriptor, inputDescriptor);
-    console.log("📏 ค่าระยะห่างใบหน้า (euclidean distance):", distance.toFixed(6));
-
-    if (distance > 0.5) {
-      return res.status(403).json({ message: `❌ ใบหน้าไม่ตรงกัน (ระยะห่าง ${distance.toFixed(4)})` });
-    }
-
-    return res.json({
-      message: `✅ ใบหน้าตรงกัน (ระยะห่าง ${distance.toFixed(4)})`,
+    res.json({
+      message: "Face saved successfully!",
       studentId: user.studentId,
-      fullName: user.fullName,
+      fullName: user.fullName
     });
-
   } catch (err) {
-    console.error("❌ เกิดข้อผิดพลาดใน uploadFace:", err);
-    res.status(500).json({ message: "เกิดข้อผิดพลาด", error: err.message });
+    res.status(500).json({ message: "Face upload failed", error: err.message });
   }
 };
 
+// ตรวจสอบใบหน้าอาจารย์ก่อนให้นักศึกษาเช็คชื่อ
 exports.verifyTeacherFace = async (req, res) => {
   try {
     const { classId, faceDescriptor } = req.body;
@@ -131,8 +130,8 @@ exports.verifyTeacherFace = async (req, res) => {
 
     const savedDescriptor = Float32Array.from(teacher.faceDescriptor);
     const inputDescriptor = Float32Array.from(faceDescriptor);
-    const distance = euclideanDistance(savedDescriptor, inputDescriptor);
-    console.log("📏 ค่าระยะห่างใบหน้าอาจารย์:", distance.toFixed(6));
+    const distance = faceapi.euclideanDistance(savedDescriptor, inputDescriptor);
+    console.log("Face distance:", distance);
 
     if (distance > 0.5) {
       return res.status(403).json({ message: "ใบหน้าไม่ตรงกับอาจารย์" });
@@ -145,11 +144,12 @@ exports.verifyTeacherFace = async (req, res) => {
   }
 };
 
+// บันทึกใบหน้าอาจารย์
 exports.saveTeacherFace = async (req, res) => {
   try {
     const { faceDescriptor } = req.body;
-    const user = await User.findById(req.user.id);
 
+    const user = await User.findById(req.user.id);
     if (!user || user.role !== "teacher") {
       return res.status(403).json({ message: "Unauthorized" });
     }
@@ -164,11 +164,15 @@ exports.saveTeacherFace = async (req, res) => {
   }
 };
 
+// นักศึกษาที่ยังไม่มีในระบบ → ลงทะเบียนใหม่
 exports.newRegister = async (req, res) => {
   try {
     const { studentId, fullName, email } = req.body;
+
+    //  ลบขีดสำหรับตรวจอีเมลและสร้าง username/password
     const strippedId = studentId.replace(/-/g, "");
 
+    // ตรวจสอบความถูกต้องเบื้องต้น
     if (!/^s\d{13}@email\.kmutnb\.ac\.th$/.test(email) || email !== `s${strippedId}@email.kmutnb.ac.th`) {
       return res.status(400).json({ message: "อีเมลไม่ถูกต้อง หรือไม่ตรงกับรหัสนักศึกษา" });
     }
@@ -189,10 +193,10 @@ exports.newRegister = async (req, res) => {
     const password_hash = await bcrypt.hash(strippedId, 10);
 
     const newUser = new User({
-      studentId,
+      studentId,            // เก็บแบบมีขีด
       fullName,
       email,
-      username: strippedId,
+      username: strippedId, // ใช้แบบไม่มีขีด
       password_hash,
       role: "student",
     });
