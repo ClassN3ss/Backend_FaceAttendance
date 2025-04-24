@@ -4,6 +4,7 @@ const jwt = require("jsonwebtoken");
 const config = require("../configuration/config");
 const faceapi = require("face-api.js");
 const Class = require("../models/Class");
+const faceapi = require("face-api.js");
 
 // นักศึกษาลงทะเบียนจากข้อมูลที่มีอยู่
 exports.register = async (req, res) => {
@@ -91,15 +92,6 @@ exports.login = async (req, res) => {
   }
 };
 
-function euclideanDistance(desc1, desc2) {
-  let sum = 0;
-  for (let i = 0; i < desc1.length; i++) {
-    const diff = desc1[i] - desc2[i];
-    sum += diff * diff;
-  }
-  return Math.sqrt(sum);
-}
-
 // อัปเดตใบหน้าและส่ง studentId + fullName กลับ
 exports.uploadFace = (req, res) => {
   upload(req, res, async function (err) {
@@ -109,27 +101,33 @@ exports.uploadFace = (req, res) => {
       const user = await User.findById(req.user.id);
       if (!user) return res.status(404).json({ message: "ไม่พบผู้ใช้" });
 
-      if (req.body.faceDescriptor && !req.file) {
-        const inputDescriptor = Float32Array.from(JSON.parse(req.body.faceDescriptor));
-        const savedDescriptor = Float32Array.from(user.faceDescriptor);
-
-        const distance = faceapi.euclideanDistance(savedDescriptor, inputDescriptor);
-        console.log("📏 ค่าระยะห่างใบหน้า (euclidean distance):", distance.toFixed(6)); // ✅ log ค่า
-
-        if (distance > 0.5) {
-          return res.status(403).json({ message: `❌ ใบหน้าไม่ตรงกัน (ระยะห่าง ${distance.toFixed(4)})` });
-        }
-
-        return res.json({
-          message: `✅ ใบหน้าตรงกัน (ระยะห่าง ${distance.toFixed(4)})`,
-          studentId: user.studentId,
-          fullName: user.fullName,
-        });
+      // ✅ ตรวจสอบว่า faceDescriptor ถูกส่งมา
+      if (!req.body.faceDescriptor) {
+        return res.status(400).json({ message: "ไม่ได้ส่ง faceDescriptor มา" });
       }
 
-      return res.status(400).json({ message: "ไม่ได้ส่ง faceDescriptor" });
+      const inputDescriptor = Float32Array.from(JSON.parse(req.body.faceDescriptor));
+
+      // ✅ ถ้ายังไม่เคยบันทึกใบหน้า
+      if (!user.faceDescriptor) {
+        return res.status(403).json({ message: "ยังไม่มีการลงทะเบียนใบหน้า" });
+      }
+
+      const savedDescriptor = Float32Array.from(user.faceDescriptor);
+      const distance = faceapi.euclideanDistance(savedDescriptor, inputDescriptor);
+      console.log("📏 ระยะห่างใบหน้า:", distance);
+
+      if (distance > 0.4) {
+        return res.status(403).json({ message: "ใบหน้าไม่ตรงกับผู้ใช้ที่เข้าสู่ระบบ" });
+      }
+
+      return res.json({
+        message: "Face matched!",
+        studentId: user.studentId,
+        fullName: user.fullName,
+      });
     } catch (err) {
-      res.status(500).json({ message: "เกิดข้อผิดพลาด", error: err.message });
+      return res.status(500).json({ message: "เกิดข้อผิดพลาด", error: err.message });
     }
   });
 };
