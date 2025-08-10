@@ -5,6 +5,10 @@ const config = require("../configuration/config");
 const faceapi = require("face-api.js");
 const Class = require("../models/Class");
 
+const multer = require("multer");
+const axios = require("axios");
+const FormData = require("form-data");
+
 // นักศึกษาลงทะเบียนจากข้อมูลที่มีอยู่
 exports.register = async (req, res) => {
   try {
@@ -92,24 +96,72 @@ exports.login = async (req, res) => {
 };
 
 // อัปเดตใบหน้าและส่ง studentId + fullName กลับ
-exports.uploadFace = async (req, res) => {
+exports.saveFaceImagesToModel = async (req, res) => {
   try {
-    const { faceDescriptor } = req.body;
+    const { fullname, studentID } = req.body;
+    const files = req.files;
 
-    const user = await User.findById(req.user.id);
-    if (!user) return res.status(404).json({ message: "User not found" });
+    const requiredKeys = ["front", "left", "right", "up", "down"];
+    for (const key of requiredKeys) {
+      if (!files[key]) {
+        return res.status(400).json({ status: "error", message: `Missing ${key} image` });
+      }
+    }
 
+    // เตรียมฟอร์มส่งให้ Python
+    const form = new FormData();
+    form.append("fullname", fullname);
+    form.append("studentID", studentID);
+    requiredKeys.forEach((key) => {
+      form.append(key, files[key][0].buffer, `${key}.jpg`);
+    });
+
+    // เรียก model
+    const response = await axios.post("http://localhost:5000/api/verify-face", form, {
+      headers: form.getHeaders(),
+      maxContentLength: Infinity,
+      maxBodyLength: Infinity
+    });
+
+    const result = response.data;
+
+    if (!result.verified) {
+      return res.json({ status: "not_verified", matchCount: result.matchCount ?? 0 });
+    }
+
+    // --- verified = true ---
+    // 1) หา user จาก DB (ระวังชื่อฟิลด์ใน schema: ส่วนมากใช้ fullName / studentId)
+    const user = await User.findOne({
+      $or: [{ studentId: studentID }, { fullName: fullname }]
+    });
+
+    if (!user) {
+      return res.status(404).json({ status: "error", message: "User not found for saving face data" });
+    }
+
+    // 2) บันทึกเวกเตอร์ทั้ง 5 มุม + mark faceScanned
+    //    แนะนำโครงสร้างเก็บแบบนี้ (ยืดหยุ่นและอ่านง่าย):
+    //    user.faceEncodings = { front: [...], left: [...], right: [...], up: [...], down: [...] }
+    user.faceEncodings = result.encodings; // object {front,left,right,up,down}
     user.faceScanned = true;
-    user.faceDescriptor = faceDescriptor;
+
     await user.save();
 
-    res.json({
-      message: "Face saved successfully!",
-      studentId: user.studentId,
-      fullName: user.fullName
+    // 3) ส่งกลับไปให้ frontend
+    return res.json({
+      status: "verified",
+      matchCount: result.matchCount,
+      user: {
+        id: user._id,
+        fullName: user.fullName,
+        studentId: user.studentId,
+        faceScanned: user.faceScanned
+      }
     });
+
   } catch (err) {
-    res.status(500).json({ message: "Face upload failed", error: err.message });
+    console.error("Error saving face:", err);
+    return res.status(500).json({ status: "error", message: "Internal server error", error: err.message });
   }
 };
 

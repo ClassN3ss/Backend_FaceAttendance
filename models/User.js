@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { Schema } = mongoose;
 
 const userSchema = new mongoose.Schema({
   studentId: { type: String, unique: true, sparse: true, trim: true },
@@ -9,7 +10,9 @@ const userSchema = new mongoose.Schema({
   role: { type: String, enum: ["student", "teacher", "admin"], default: "student", required: true },
   email: { type: String, trim: true, lowercase: true, default: "" },
   faceScanned: { type: Boolean, default: false },
-  faceDescriptor: { type: [Number] },
+
+  faceEncodings: { type: Schema.Types.Mixed, default: null },
+  faceCentroid: { type: [Number], default: undefined },
 });
 
 module.exports = mongoose.model("User", userSchema);

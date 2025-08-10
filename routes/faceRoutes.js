@@ -1,9 +1,9 @@
 const express = require("express");
 const router = express.Router();
-const { findStudentByFace, verifyTeacherFace } = require("../controllers/faceController");
+const { verifyVectorById, verifyTeacherFace } = require("../controllers/faceController");
 const { verifyToken } = require("../middleware/authMiddleware");
 
-router.post("/find-student", verifyToken, findStudentByFace);
+router.post("/verify-vector-by-id", verifyVectorById);
 
 router.post("/find-teacher", verifyToken, verifyTeacherFace);
 

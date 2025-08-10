@@ -2,45 +2,107 @@ const User = require("../models/User");
 const jwt = require("jsonwebtoken");
 const config = require("../configuration/config");
 
-const cosineDistance = (a, b) => {
-  const dot = a.reduce((sum, ai, i) => sum + ai * b[i], 0);
-  const magA = Math.sqrt(a.reduce((sum, ai) => sum + ai * ai, 0));
-  const magB = Math.sqrt(b.reduce((sum, bi) => sum + bi * bi, 0));
-  return 1 - dot / (magA * magB);
-};
+const INTERNAL_KEY = process.env.INTERNAL_FACE_API_KEY || "dev-internal-key";
+const THRESHOLD = Number(process.env.FACE_MATCH_THRESHOLD || 0.4);
 
-exports.findStudentByFace = async (req, res) => {
+const isVec = (v) =>
+  Array.isArray(v) && v.length === 128 && v.every((n) => typeof n === "number");
+
+function euclidean(a, b) {
+  if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return Infinity;
+  let sum = 0;
+  for (let i = 0; i < a.length; i++) {
+    const d = a[i] - b[i];
+    sum += d * d;
+  }
+  return Math.sqrt(sum);
+}
+
+function collectRefVectors(user) {
+  const refs = [];
+
+  // 1) centroid
+  if (isVec(user.faceCentroid)) {
+    refs.push({ vec: user.faceCentroid, label: "centroid" });
+  }
+
+  // 2) encodings
+  const enc = user.faceEncodings;
+  if (enc) {
+    if (Array.isArray(enc)) {
+      enc.forEach((v, i) => {
+        if (isVec(v)) refs.push({ vec: v, label: `enc[${i}]` });
+      });
+    } else if (typeof enc === "object") {
+      ["front", "left", "right", "up", "down"].forEach((k) => {
+        const v = enc?.[k];
+        if (isVec(v)) refs.push({ vec: v, label: k });
+      });
+    }
+  }
+
+  return refs;
+}
+
+exports.verifyVectorById = async (req, res) => {
   try {
-    const { faceDescriptor } = req.body;
-    if (!faceDescriptor || faceDescriptor.length !== config.face.descriptorLength) {
-      return res.status(400).json({ message: "Invalid face descriptor" });
+    // อนุญาตเฉพาะ service ภายใน (Face API) เรียก
+    if (req.headers["x-internal-key"] !== INTERNAL_KEY) {
+      return res.status(401).json({ ok: false, message: "unauthorized" });
     }
 
-    const students = await User.find({ role: "student", faceScanned: true });
+    console.log("[verifyVectorById] headers:", req.headers);
+    console.log("[verifyVectorById] raw body:", req.body);
 
-    let bestMatch = null;
-    let lowestDistance = Infinity;
-
-    for (const student of students) {
-      if (!student.faceDescriptor) continue;
-      const dist = cosineDistance(faceDescriptor, student.faceDescriptor);
-      if (dist < lowestDistance) {
-        lowestDistance = dist;
-        bestMatch = student;
-      }
+    const { studentID, faceVector } = req.body || {};
+    if (!studentID || !Array.isArray(faceVector)) {
+      return res
+        .status(400)
+        .json({ ok: false, message: "missing studentID or faceVector" });
     }
 
-    if (!bestMatch || lowestDistance > 0.5) {
-      return res.status(404).json({ message: "No matching student found" });
+    // แปลงเป็น number array
+    const fv = faceVector.map((n) => Number(n));
+    if (!isVec(fv)) {
+      return res.status(400).json({ ok: false, message: "invalid faceVector" });
     }
 
-    res.json({
-      studentId: bestMatch.studentId,
-      fullName: bestMatch.fullName,
-      distance: lowestDistance.toFixed(4),
+    const user = await User.findOne({
+      studentId: String(studentID).trim(),
+    }).lean();
+
+    if (!user) {
+      return res.status(404).json({ ok: false, message: "user not found" });
+    }
+
+    const refs = collectRefVectors(user);
+    if (!refs.length) {
+      return res
+        .status(422)
+        .json({ ok: false, message: "no reference vectors for this user" });
+    }
+
+    // คำนวณระยะกับทุกเวกเตอร์ แล้วเรียงน้อย -> มาก
+    const distances = refs.map((r) => ({
+      label: r.label,
+      distance: euclidean(r.vec, fv),
+    })).sort((a, b) => a.distance - b.distance);
+
+    const best = distances[0];
+    const match = best.distance <= THRESHOLD;
+
+    return res.json({
+      ok: true,
+      match,
+      distance: best.distance,
+      threshold: THRESHOLD,
+      bestRef: best.label,
+      allDistances: distances,
+      userId: user._id,
+      studentID: String(studentID).trim(),
     });
   } catch (err) {
-    res.status(500).json({ message: "Error finding student", error: err.message });
+    return res.status(500).json({ ok: false, message: err.message });
   }
 };
 

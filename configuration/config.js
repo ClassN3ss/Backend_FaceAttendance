@@ -7,7 +7,7 @@ module.exports = {
   },
 
   database: {
-    uri: process.env.MONGO_URI || "mongodb://localhost:27017/facescan",
+    uri: process.env.MONGO_URI || "mongodb+srv://Aadmin:facescan_ab@cluster0.7jxizye.mongodb.net/facescan?retryWrites=true&w=majority&appName=Cluster0",
   },
 
   roles: {

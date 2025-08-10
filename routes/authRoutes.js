@@ -1,13 +1,23 @@
 const express = require("express");
 const router = express.Router();
-const { register, login, uploadFace, verifyTeacherFace, saveTeacherFace, newRegister } = require("../controllers/authController");
+const { register, login, saveFaceImagesToModel, verifyTeacherFace, saveTeacherFace, newRegister } = require("../controllers/authController");
 const { verifyToken,} = require("../middleware/authMiddleware");
+
+const multer = require("multer");
+const storage = multer.memoryStorage();
+const upload = multer({ storage });
 
 router.post("/register", register);
 router.post("/new-register", newRegister);
 router.post("/login", login);
 
-router.post("/upload-face", verifyToken, uploadFace);
+router.post(
+  "/save-face-model",
+  upload.fields([
+    { name: "front" }, { name: "left" }, { name: "right" }, { name: "up" }, { name: "down" },
+  ]),
+  saveFaceImagesToModel
+);
 
 router.post("/verify-teacher-face", verifyToken, verifyTeacherFace);
 router.post("/save-teacher-face", verifyToken, saveTeacherFace);
