@@ -19,8 +19,7 @@ router.post(
   saveFaceImagesToModel
 );
 
-router.post("/verify-teacher-face", verifyToken, verifyTeacherFace);
-router.post("/save-teacher-face", verifyToken, saveTeacherFace);
+router.post("/save-teacher-face", verifyToken, upload.single("image"), saveTeacherFace);
 
 router.get("/me", verifyToken, (req, res) => {
   res.json(req.user);

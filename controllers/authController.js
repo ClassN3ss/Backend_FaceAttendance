@@ -165,54 +165,79 @@ exports.saveFaceImagesToModel = async (req, res) => {
   }
 };
 
-// ตรวจสอบใบหน้าอาจารย์ก่อนให้นักศึกษาเช็คชื่อ
-exports.verifyTeacherFace = async (req, res) => {
-  try {
-    const { classId, faceDescriptor } = req.body;
-
-    const classroom = await Class.findById(classId).populate("teacherId");
-    if (!classroom || !classroom.teacherId) {
-      return res.status(404).json({ message: "ไม่พบอาจารย์ในคลาสนี้" });
-    }
-
-    const teacher = classroom.teacherId;
-    if (!teacher.faceDescriptor) {
-      return res.status(403).json({ message: "อาจารย์ยังไม่ได้สแกนใบหน้า" });
-    }
-
-    const savedDescriptor = Float32Array.from(teacher.faceDescriptor);
-    const inputDescriptor = Float32Array.from(faceDescriptor);
-    const distance = faceapi.euclideanDistance(savedDescriptor, inputDescriptor);
-    console.log("Face distance:", distance);
-
-    if (distance > 0.5) {
-      return res.status(403).json({ message: "ใบหน้าไม่ตรงกับอาจารย์" });
-    }
-
-    res.json({ message: "ยืนยันตัวตนสำเร็จ" });
-  } catch (err) {
-    console.error("ตรวจสอบอาจารย์ล้มเหลว:", err);
-    res.status(500).json({ message: "ตรวจสอบอาจารย์ล้มเหลว", error: err.message });
-  }
-};
-
 // บันทึกใบหน้าอาจารย์
 exports.saveTeacherFace = async (req, res) => {
   try {
-    const { faceDescriptor } = req.body;
-
-    const user = await User.findById(req.user.id);
-    if (!user || user.role !== "teacher") {
-      return res.status(403).json({ message: "Unauthorized" });
+    // ✅ ต้อง login แล้ว และเป็นอาจารย์เท่านั้น
+    const userId = req.user?.id || req.user?._id;
+    if (!userId) {
+      return res.status(401).json({ ok: false, code: 'NO_USER_ID', message: 'Unauthorized' });
     }
 
-    user.faceDescriptor = faceDescriptor;
-    user.faceScanned = true;
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ ok: false, code: 'USER_NOT_FOUND', message: 'User not found' });
+    }
+
+    const role = String(user.role || '').trim().toLowerCase();
+    if (role !== 'teacher') {
+      return res.status(403).json({ ok: false, code: 'NOT_TEACHER', message: 'Forbidden: role' });
+    }
+
+    // ✅ รับไฟล์รูปเดียว + fullname (จาก frontend)
+    const file = req.file; // multer.single("image")
+    const { fullname } = req.body || {};
+
+    if (!file) {
+      return res.status(400).json({ ok: false, code: 'NO_IMAGE', message: 'image is required' });
+    }
+    if (!fullname || !fullname.trim()) {
+      return res.status(400).json({ ok: false, code: 'NO_NAME', message: 'fullname is required' });
+    }
+
+    // ✅ ส่งรูป + fullname ไปหา Model (/api/teacher-saveface)
+    const MODEL_BASE_URL = process.env.MODEL_BASE_URL || 'http://localhost:5000';
+    const form = new FormData();
+    form.append('image', file.buffer, { filename: file.originalname, contentType: file.mimetype });
+    form.append('fullname', fullname.trim());
+
+    const { data } = await axios.post(`${MODEL_BASE_URL}/api/teacher-saveface`, form, {
+      headers: form.getHeaders(), // อย่าตั้ง Content-Type เอง ให้ form กำหนด boundary
+      timeout: 15_000,
+      maxContentLength: Infinity,
+      maxBodyLength: Infinity,
+    });
+
+    if (!data?.ok) {
+      return res.status(400).json({
+        ok: false,
+        code: 'ENCODE_FAILED',
+        message: data?.message || 'encode failed',
+      });
+    }
+
+    // ✅ บันทึก descriptor + สถานะลง Mongo
+    user.faceEncodings = data.descriptor;            // Array length 128
+    user.faceScanned = true;                          // เคยสแกนแล้ว
+    user.faceImagePath = data.imagePath || null;      // "teacher/<folder>/<folder>.jpg"
+    user.personKey = data.personKey || null;          // "<folder>" หลัง sanitize
+    user.faceSavedAt = new Date();
     await user.save();
 
-    res.json({ message: "Teacher face saved!" });
+    return res.json({
+      ok: true,
+      message: 'บันทึกใบหน้าสำเร็จ',
+      teacher: { id: user._id, fullName: fullname.trim() },
+      imagePath: user.faceImagePath,
+    });
   } catch (err) {
-    res.status(500).json({ message: "Save teacher face failed", error: err.message });
+    console.error('Save teacher face failed:', err);
+    return res.status(500).json({
+      ok: false,
+      code: 'INTERNAL_ERROR',
+      message: 'Save teacher face failed',
+      error: err?.message,
+    });
   }
 };
 

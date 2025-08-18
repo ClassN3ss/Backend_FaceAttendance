@@ -43,7 +43,7 @@ connectDB();
 
 app.use("/auth", authRoutes);
 
-app.use("/api/students", faceRoutes);
+app.use("/api/face", faceRoutes);
 app.use("/api/attendance", attendanceRoutes);
 
 app.use("/api", userRoutes);
@@ -54,8 +54,6 @@ app.use("/api/enrolls", enrollRoutes);
 app.use("/api/search", searchRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/checkin-sessions", checkinSessionRoutes);
-
-app.use("/api/face", faceRoutes);
 
 app.get("/", (req, res) => {
   res.send("API is running...");

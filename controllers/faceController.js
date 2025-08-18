@@ -1,6 +1,9 @@
 const User = require("../models/User");
 const jwt = require("jsonwebtoken");
 const config = require("../configuration/config");
+const Class = require("../models/Class");
+const FormData = require("form-data");
+const axios = require("axios");
 
 const INTERNAL_KEY = process.env.INTERNAL_FACE_API_KEY || "dev-internal-key";
 const THRESHOLD = Number(process.env.FACE_MATCH_THRESHOLD || 0.4);
@@ -108,24 +111,60 @@ exports.verifyVectorById = async (req, res) => {
 
 exports.verifyTeacherFace = async (req, res) => {
   try {
-    const { faceDescriptor } = req.body;
-    const teacher = await User.findById(req.user.id);
+    const { fullname, classId } = req.body;
+    const file = req.file; // multer.single("image")
 
-    if (!teacher || teacher.role !== "teacher" || !teacher.faceDescriptor) {
-      return res.status(403).json({ message: "คุณไม่ใช่อาจารย์ หรือยังไม่บันทึกใบหน้า" });
+    if (!file) return res.status(400).json({ ok: false, message: "image is required" });
+    if (!fullname || !fullname.trim()) return res.status(400).json({ ok: false, message: "fullname is required" });
+    if (!classId) return res.status(400).json({ ok: false, message: "classId is required" });
+
+    // 1) หา class -> teacher
+    const classroom = await Class.findById(classId).populate("teacherId");
+    if (!classroom || !classroom.teacherId) {
+      return res.status(404).json({ ok: false, message: "ไม่พบอาจารย์ในคลาสนี้" });
     }
 
-    const distance = cosineDistance(faceDescriptor, teacher.faceDescriptor);
-
-    if (distance > 0.5) {
-      return res.status(403).json({ message: "ใบหน้าไม่ตรงกับอาจารย์" });
+    const teacher = classroom.teacherId;
+    // ✅ ใช้ faceEncodings ให้ตรงกับ Schema
+    const saved = teacher.faceEncodings;  
+    if (!saved) {
+      return res.status(403).json({ ok: false, message: "อาจารย์ยังไม่ได้สแกนใบหน้า" });
     }
 
-    teacher.lastVerifiedAt = new Date(); // (Optional) สำหรับบันทึกเวลา
-    await teacher.save();
+    // 2) ส่งรูปไปหา Model เพื่อ encode
+    const MODEL_BASE_URL = process.env.MODEL_BASE_URL || "http://localhost:5000";
+    const form = new (require("form-data"))();
+    form.append("image", file.buffer, { filename: file.originalname, contentType: file.mimetype });
+    form.append("fullname", fullname.trim());
 
-    res.json({ message: "ใบหน้าอาจารย์ถูกต้อง", distance: distance.toFixed(4) });
+    const { data } = await axios.post(`${MODEL_BASE_URL}/api/teacher-scan`, form, {
+      headers: form.getHeaders(),
+      timeout: 15000,
+      maxContentLength: Infinity,
+      maxBodyLength: Infinity,
+    });
+
+    if (!data?.ok || !data?.descriptor) {
+      return res.status(400).json({ ok: false, message: data?.message || "encode failed" });
+    }
+
+    // 3) เทียบเวกเตอร์
+    const fv1 = Array.from(saved);              // ที่บันทึกไว้ใน DB
+    const fv2 = Array.from(data.descriptor);    // ที่ encode จากรูปใหม่
+    const distance = euclidean(fv1, fv2);
+
+    const threshold = Number(process.env.FACE_MATCH_THRESHOLD || 0.5);
+    const match = distance <= threshold;
+
+    return res.json({
+      ok: true,
+      match,
+      distance,
+      threshold,
+      teacher: { id: teacher._id, fullName: teacher.fullName || fullname.trim() },
+    });
   } catch (err) {
-    res.status(500).json({ message: "ตรวจสอบใบหน้าอาจารย์ล้มเหลว", error: err.message });
+    console.error("verifyTeacherFace failed:", err.message);
+    return res.status(500).json({ ok: false, message: "verify teacher failed", error: err.message });
   }
 };
