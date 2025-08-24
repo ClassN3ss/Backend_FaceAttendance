@@ -24,12 +24,7 @@ function euclidean(a, b) {
 function collectRefVectors(user) {
   const refs = [];
 
-  // 1) centroid
-  if (isVec(user.faceCentroid)) {
-    refs.push({ vec: user.faceCentroid, label: "centroid" });
-  }
-
-  // 2) encodings
+  // encodings
   const enc = user.faceEncodings;
   if (enc) {
     if (Array.isArray(enc)) {
