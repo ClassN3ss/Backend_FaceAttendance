@@ -27,7 +27,7 @@ app.use(express.json());
 
 const allowedOrigins = [
   'http://localhost:3000',
-  'https://project-face-attendance.vercel.app'
+  'https://face-attendance-app-6a300d9fcfd7.herokuapp.com'
 ];
 
 app.use(cors({
