@@ -127,7 +127,7 @@ exports.verifyTeacherFace = async (req, res) => {
     }
 
     // 2) ส่งรูปไปหา Model เพื่อ encode
-    const MODEL_BASE_URL = process.env.MODEL_BASE_URL || "http://localhost:5000";
+    const MODEL_BASE_URL = process.env.MODEL_BASE_URL || "https://face-api-md-97765e8728dc.herokuapp.com/";
     const form = new (require("form-data"))();
     form.append("image", file.buffer, { filename: file.originalname, contentType: file.mimetype });
     form.append("fullname", fullname.trim());
