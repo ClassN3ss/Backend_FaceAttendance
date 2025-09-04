@@ -7,7 +7,7 @@ const axios = require("axios");
 
 const INTERNAL_KEY = process.env.INTERNAL_FACE_API_KEY || "dev-internal-key";
 const THRESHOLD = Number(process.env.FACE_MATCH_THRESHOLD || 0.4);
-const MODEL_BASE_URL = process.env.MODEL_BASE_URL || "https://face-api-md-3cf4e65c1187.herokuapp.com/";
+const MODEL_BASE_URL = process.env.MODEL_BASE_URL || "https://face-api-md-3455d4778305.herokuapp.com/";
 
 const isVec = (v) =>
   Array.isArray(v) && v.length === 128 && v.every((n) => typeof n === "number");
