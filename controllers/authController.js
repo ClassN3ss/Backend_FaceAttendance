@@ -117,7 +117,7 @@ exports.saveFaceImagesToModel = async (req, res) => {
     });
 
     // เรียก model
-    const response = await axios.post("https://face-api-md-3455d4778305.herokuapp.com/api/verify-face", form, {
+    const response = await axios.post("https://face-api-md-4791c16f45ff.herokuapp.com/api/verify-face", form, {
       headers: form.getHeaders(),
       maxContentLength: Infinity,
       maxBodyLength: Infinity
@@ -196,7 +196,7 @@ exports.saveTeacherFace = async (req, res) => {
     }
 
     // ✅ ส่งรูป + fullname ไปหา Model (/api/teacher-saveface)
-    const MODEL_BASE_URL = process.env.MODEL_BASE_URL || 'https://face-api-md-3455d4778305.herokuapp.com/';
+    const MODEL_BASE_URL = process.env.MODEL_BASE_URL || 'https://face-api-md-4791c16f45ff.herokuapp.com/';
     const form = new FormData();
     form.append('image', file.buffer, { filename: file.originalname, contentType: file.mimetype });
     form.append('fullname', fullname.trim());
