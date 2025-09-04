@@ -7,6 +7,7 @@ const axios = require("axios");
 
 const INTERNAL_KEY = process.env.INTERNAL_FACE_API_KEY || "dev-internal-key";
 const THRESHOLD = Number(process.env.FACE_MATCH_THRESHOLD || 0.4);
+const MODEL_BASE_URL = process.env.MODEL_BASE_URL || "https://face-api-md-3cf4e65c1187.herokuapp.com/";
 
 const isVec = (v) =>
   Array.isArray(v) && v.length === 128 && v.every((n) => typeof n === "number");
@@ -42,65 +43,36 @@ function collectRefVectors(user) {
   return refs;
 }
 
-exports.verifyVectorById = async (req, res) => {
+exports.verifyByImage = async (req, res) => {
   try {
-    // อนุญาตเฉพาะ service ภายใน (Face API) เรียก
-    if (req.headers["x-internal-key"] !== INTERNAL_KEY) {
-      return res.status(401).json({ ok: false, message: "unauthorized" });
-    }
+    const file = req.file; // multer.single("image")
+    const { studentID, fullname } = req.body || {};
 
-    console.log("[verifyVectorById] headers:", req.headers);
-    console.log("[verifyVectorById] raw body:", req.body);
+    if (!file) return res.status(400).json({ ok: false, message: "image is required" });
+    if (!studentID || !String(studentID).trim())
+      return res.status(400).json({ ok: false, message: "studentID is required" });
 
-    const { studentID, faceVector } = req.body || {};
-    if (!studentID || !Array.isArray(faceVector)) {
-      return res
-        .status(400)
-        .json({ ok: false, message: "missing studentID or faceVector" });
-    }
-
-    // แปลงเป็น number array
-    const fv = faceVector.map((n) => Number(n));
-    if (!isVec(fv)) {
-      return res.status(400).json({ ok: false, message: "invalid faceVector" });
-    }
-
-    const user = await User.findOne({
-      studentId: String(studentID).trim(),
-    }).lean();
-
-    if (!user) {
-      return res.status(404).json({ ok: false, message: "user not found" });
-    }
-
-    const refs = collectRefVectors(user);
-    if (!refs.length) {
-      return res
-        .status(422)
-        .json({ ok: false, message: "no reference vectors for this user" });
-    }
-
-    // คำนวณระยะกับทุกเวกเตอร์ แล้วเรียงน้อย -> มาก
-    const distances = refs.map((r) => ({
-      label: r.label,
-      distance: euclidean(r.vec, fv),
-    })).sort((a, b) => a.distance - b.distance);
-
-    const best = distances[0];
-    const match = best.distance <= THRESHOLD;
-
-    return res.json({
-      ok: true,
-      match,
-      distance: best.distance,
-      threshold: THRESHOLD,
-      bestRef: best.label,
-      allDistances: distances,
-      userId: user._id,
-      studentID: String(studentID).trim(),
+    const form = new (require("form-data"))();
+    form.append("image", file.buffer, {
+      filename: file.originalname || "face.jpg",
+      contentType: file.mimetype || "image/jpeg",
     });
+    form.append("studentID", String(studentID).trim());
+    if (fullname) form.append("fullname", String(fullname).trim());
+    // ส่ง threshold จากฝั่ง Backend ไปคุมค่ากลาง
+    form.append("threshold", String(THRESHOLD));
+
+    const { data } = await axios.post(`${MODEL_BASE_URL}/api/scan-face`, form, {
+      headers: { ...form.getHeaders(), "x-internal-key": INTERNAL_KEY },
+      timeout: 15000,
+      maxContentLength: Infinity,
+      maxBodyLength: Infinity,
+    });
+
+    return res.status(200).json(data);
   } catch (err) {
-    return res.status(500).json({ ok: false, message: err.message });
+    console.error("verifyByImage failed:", err?.message);
+    return res.status(500).json({ ok: false, message: "verify by image failed", error: err?.message });
   }
 };
 
@@ -127,7 +99,6 @@ exports.verifyTeacherFace = async (req, res) => {
     }
 
     // 2) ส่งรูปไปหา Model เพื่อ encode
-    const MODEL_BASE_URL = process.env.MODEL_BASE_URL || "https://face-api-md-3cf4e65c1187.herokuapp.com/";
     const form = new (require("form-data"))();
     form.append("image", file.buffer, { filename: file.originalname, contentType: file.mimetype });
     form.append("fullname", fullname.trim());
