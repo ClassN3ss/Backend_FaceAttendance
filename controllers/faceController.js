@@ -7,7 +7,6 @@ const axios = require("axios");
 
 const INTERNAL_KEY = process.env.INTERNAL_FACE_API_KEY || "dev-internal-key";
 const THRESHOLD = Number(process.env.FACE_MATCH_THRESHOLD || 0.4);
-const MODEL_BASE_URL = process.env.MODEL_BASE_URL || "https://face-api-md-3455d4778305.herokuapp.com/";
 
 const isVec = (v) =>
   Array.isArray(v) && v.length === 128 && v.every((n) => typeof n === "number");
@@ -61,6 +60,8 @@ exports.verifyByImage = async (req, res) => {
     if (fullname) form.append("fullname", String(fullname).trim());
     // ส่ง threshold จากฝั่ง Backend ไปคุมค่ากลาง
     form.append("threshold", String(THRESHOLD));
+    
+    const MODEL_BASE_URL = process.env.MODEL_BASE_URL || "https://face-api-md-3455d4778305.herokuapp.com/";
 
     const { data } = await axios.post(`${MODEL_BASE_URL}/api/scan-face`, form, {
       headers: { ...form.getHeaders(), "x-internal-key": INTERNAL_KEY },
@@ -99,6 +100,7 @@ exports.verifyTeacherFace = async (req, res) => {
     }
 
     // 2) ส่งรูปไปหา Model เพื่อ encode
+    const MODEL_BASE_URL = process.env.MODEL_BASE_URL || "https://face-api-md-3455d4778305.herokuapp.com/";
     const form = new (require("form-data"))();
     form.append("image", file.buffer, { filename: file.originalname, contentType: file.mimetype });
     form.append("fullname", fullname.trim());
