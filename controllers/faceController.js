@@ -7,41 +7,8 @@ const axios = require("axios");
 
 const INTERNAL_KEY = process.env.INTERNAL_FACE_API_KEY || "dev-internal-key";
 const THRESHOLD = Number(process.env.FACE_MATCH_THRESHOLD || 0.4);
-const MODEL_BASE_URL = process.env.MODEL_BASE_URL || "https://face-api-md-4791c16f45ff.herokuapp.com";
-
-const isVec = (v) =>
-  Array.isArray(v) && v.length === 128 && v.every((n) => typeof n === "number");
-
-function euclidean(a, b) {
-  if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return Infinity;
-  let sum = 0;
-  for (let i = 0; i < a.length; i++) {
-    const d = a[i] - b[i];
-    sum += d * d;
-  }
-  return Math.sqrt(sum);
-}
-
-function collectRefVectors(user) {
-  const refs = [];
-
-  // encodings
-  const enc = user.faceEncodings;
-  if (enc) {
-    if (Array.isArray(enc)) {
-      enc.forEach((v, i) => {
-        if (isVec(v)) refs.push({ vec: v, label: `enc[${i}]` });
-      });
-    } else if (typeof enc === "object") {
-      ["front", "left", "right", "up", "down"].forEach((k) => {
-        const v = enc?.[k];
-        if (isVec(v)) refs.push({ vec: v, label: k });
-      });
-    }
-  }
-
-  return refs;
-}
+const TEACHER_THRESHOLD = Number(process.env.FACE_MATCH_THRESHOLD || 0.5);
+const MODEL_BASE_URL = process.env.MODEL_BASE_URL || "https://face-api-md-10051b97ec95.herokuapp.com";
 
 exports.verifyByImage = async (req, res) => {
   try {
@@ -78,59 +45,43 @@ exports.verifyByImage = async (req, res) => {
 
 exports.verifyTeacherFace = async (req, res) => {
   try {
-    const { fullname, classId } = req.body;
+    const { classId } = req.body;
     const file = req.file; // multer.single("image")
 
     if (!file) return res.status(400).json({ ok: false, message: "image is required" });
-    if (!fullname || !fullname.trim()) return res.status(400).json({ ok: false, message: "fullname is required" });
     if (!classId) return res.status(400).json({ ok: false, message: "classId is required" });
 
-    // 1) หา class -> teacher
-    const classroom = await Class.findById(classId).populate("teacherId");
+    // หา teacherId จาก class โดยไม่ต้อง populate ตัวเต็ม
+    const classroom = await Class.findById(classId).select("teacherId").lean();
     if (!classroom || !classroom.teacherId) {
       return res.status(404).json({ ok: false, message: "ไม่พบอาจารย์ในคลาสนี้" });
     }
+    // รองรับทั้งกรณีเป็น ObjectId ตรง ๆ หรือ {_id: ...}
+    const teacherId =
+      (classroom.teacherId && classroom.teacherId._id?.toString?.()) ||
+      (classroom.teacherId && classroom.teacherId.toString?.()) ||
+      classroom.teacherId;
 
-    const teacher = classroom.teacherId;
-    // ✅ ใช้ faceEncodings ให้ตรงกับ Schema
-    const saved = teacher.faceEncodings;  
-    if (!saved) {
-      return res.status(403).json({ ok: false, message: "อาจารย์ยังไม่ได้สแกนใบหน้า" });
-    }
-
-    // 2) ส่งรูปไปหา Model เพื่อ encode
+    // ส่งรูป + teacherID + threshold ไปให้ Model เทียบกับ MongoDB ที่ Model
     const form = new (require("form-data"))();
-    form.append("image", file.buffer, { filename: file.originalname, contentType: file.mimetype });
-    form.append("fullname", fullname.trim());
+    form.append("image", file.buffer, {
+      filename: file.originalname || "face.jpg",
+      contentType: file.mimetype || "image/jpeg",
+    });
+    form.append("teacherID", String(teacherId));
+    form.append("threshold", String(TEACHER_THRESHOLD));
 
-    const { data } = await axios.post(`${MODEL_BASE_URL}/api/teacher-scan`, form, {
-      headers: form.getHeaders(),
+    const { data } = await axios.post(`${MODEL_BASE}/api/scan-teacher`, form, {
+      headers: { ...form.getHeaders(), "x-internal-key": INTERNAL_KEY },
       timeout: 15000,
       maxContentLength: Infinity,
       maxBodyLength: Infinity,
     });
 
-    if (!data?.ok || !data?.descriptor) {
-      return res.status(400).json({ ok: false, message: data?.message || "encode failed" });
-    }
-
-    // 3) เทียบเวกเตอร์
-    const fv1 = Array.from(saved);              // ที่บันทึกไว้ใน DB
-    const fv2 = Array.from(data.descriptor);    // ที่ encode จากรูปใหม่
-    const distance = euclidean(fv1, fv2);
-
-    const threshold = Number(process.env.FACE_MATCH_THRESHOLD || 0.5);
-    const match = distance <= threshold;
-
-    return res.json({
-      ok: true,
-      match,
-      distance,
-      threshold,
-      teacher: { id: teacher._id, fullName: teacher.fullName || fullname.trim() },
-    });
+    // ส่งผล match/distance/threshold กลับ FE ตรง ๆ
+    return res.status(200).json(data);
   } catch (err) {
-    console.error("verifyTeacherFace failed:", err.message);
-    return res.status(500).json({ ok: false, message: "verify teacher failed", error: err.message });
+    console.error("verifyTeacherFace (new flow) failed:", err?.message);
+    return res.status(500).json({ ok: false, message: "verify teacher failed", error: err?.message });
   }
 };
