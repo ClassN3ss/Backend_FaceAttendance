@@ -196,7 +196,7 @@ exports.saveTeacherFace = async (req, res) => {
     }
 
     // ✅ ส่งรูป + fullname ไปหา Model (/api/teacher-saveface)
-    const MODEL_BASE_URL = process.env.MODEL_BASE_URL || 'https://face-api-md-428d27208c88.herokuapp.com/';
+    const MODEL_BASE_URL = process.env.MODEL_BASE_URL || 'https://face-api-md-428d27208c88.herokuapp.com';
     const form = new FormData();
     form.append('image', file.buffer, { filename: file.originalname, contentType: file.mimetype });
     form.append('fullname', fullname.trim());
