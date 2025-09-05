@@ -71,7 +71,7 @@ exports.verifyTeacherFace = async (req, res) => {
     form.append("teacherID", String(teacherId));
     form.append("threshold", String(TEACHER_THRESHOLD));
 
-    const { data } = await axios.post(`${MODEL_BASE}/api/scan-teacher`, form, {
+    const { data } = await axios.post(`${MODEL_BASE_URL}/api/scan-teacher`, form, {
       headers: { ...form.getHeaders(), "x-internal-key": INTERNAL_KEY },
       timeout: 15000,
       maxContentLength: Infinity,
