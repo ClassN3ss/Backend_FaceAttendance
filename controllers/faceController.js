@@ -7,7 +7,7 @@ const axios = require("axios");
 
 const INTERNAL_KEY = process.env.INTERNAL_FACE_API_KEY || "dev-internal-key";
 const THRESHOLD = Number(process.env.FACE_MATCH_THRESHOLD || 0.4);
-const TEACHER_THRESHOLD = Number(process.env.FACE_MATCH_THRESHOLD || 0.4);
+const TEACHER_THRESHOLD = Number(process.env.FACE_MATCH_THRESHOLD || 0.5);
 const MODEL_BASE_URL = process.env.MODEL_BASE_URL || "https://face-api-md-428d27208c88.herokuapp.com";
 
 exports.verifyByImage = async (req, res) => {
@@ -61,6 +61,8 @@ exports.verifyTeacherFace = async (req, res) => {
       (classroom.teacherId && classroom.teacherId._id?.toString?.()) ||
       (classroom.teacherId && classroom.teacherId.toString?.()) ||
       classroom.teacherId;
+
+    form.append("teacherID", String(teacherId));
 
     // ส่งรูป + teacherID + threshold ไปให้ Model เทียบกับ MongoDB ที่ Model
     const form = new (require("form-data"))();
