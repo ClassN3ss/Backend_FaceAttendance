@@ -57,12 +57,7 @@ exports.verifyTeacherFace = async (req, res) => {
       return res.status(404).json({ ok: false, message: "ไม่พบอาจารย์ในคลาสนี้" });
     }
     // รองรับทั้งกรณีเป็น ObjectId ตรง ๆ หรือ {_id: ...}
-    const teacherId =
-      (classroom.teacherId && classroom.teacherId._id?.toString?.()) ||
-      (classroom.teacherId && classroom.teacherId.toString?.()) ||
-      classroom.teacherId;
-
-    form.append("teacherID", String(teacherId));
+    const teacherId = classroom.teacherId?.toString?.() || String(classroom.teacherId);
 
     // ส่งรูป + teacherID + threshold ไปให้ Model เทียบกับ MongoDB ที่ Model
     const form = new (require("form-data"))();
@@ -70,7 +65,7 @@ exports.verifyTeacherFace = async (req, res) => {
       filename: file.originalname || "face.jpg",
       contentType: file.mimetype || "image/jpeg",
     });
-    form.append("teacherID", String(teacherId));
+    form.append("teacherID", teacherId);                    // ← users._id
     form.append("threshold", String(TEACHER_THRESHOLD));
 
     const { data } = await axios.post(`${MODEL_BASE_URL}/api/scan-teacher`, form, {
