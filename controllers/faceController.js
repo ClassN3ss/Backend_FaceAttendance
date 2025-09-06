@@ -66,7 +66,19 @@ exports.verifyTeacherFace = async (req, res) => {
 
     // ส่งรูป + teacherID + threshold ไปให้ Model เทียบกับ MongoDB ที่ Model
     const form = new (require("form-data"))();
+    form.append("image", file.buffer, {
+      filename: file.originalname || "face.jpg",
+      contentType: file.mimetype || "image/jpeg",
+    });
+    form.append("teacherID", String(teacherId));
+    form.append("threshold", String(TEACHER_THRESHOLD));
 
+    const { data } = await axios.post(`${MODEL_BASE_URL}/api/scan-teacher`, form, {
+      headers: { ...form.getHeaders(), "x-internal-key": INTERNAL_KEY },
+      timeout: 15000,
+      maxContentLength: Infinity,
+      maxBodyLength: Infinity,
+    });
 
     // ส่งผล match/distance/threshold กลับ FE ตรง ๆ
     return res.status(200).json(data);
