@@ -27,7 +27,7 @@ app.use(express.json());
 
 const allowedOrigins = [
   'http://localhost:3000',
-  'https://face-attendance-app-6a300d9fcfd7.herokuapp.com'
+  'https://face-attendance-app-8b8ea6121434.herokuapp.com'
 ];
 
 app.use(cors({
