@@ -101,7 +101,7 @@ exports.saveFaceImagesToModel = async (req, res) => {
     const { fullname, studentID } = req.body;
     const files = req.files;
 
-    const requiredKeys = ["front", "left", "right"];
+    const requiredKeys = ["front", "left", "right", "up", "down"];
     for (const key of requiredKeys) {
       if (!files[key]) {
         return res.status(400).json({ status: "error", message: `Missing ${key} image` });
@@ -113,7 +113,8 @@ exports.saveFaceImagesToModel = async (req, res) => {
     form.append("fullname", fullname);
     form.append("studentID", studentID);
     requiredKeys.forEach((key) => {
-      form.append(key, files[key][0].buffer, `${key}.jpg`);
+      const f = files[key][0];
+      form.append(key, f.buffer, f.originalname); // ใช้ชื่อจริง (อาจเป็น .webp หรือ .jpg)
     });
 
     // เรียก model
