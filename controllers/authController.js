@@ -101,7 +101,7 @@ exports.saveFaceImagesToModel = async (req, res) => {
     const { fullname, studentID } = req.body;
     const files = req.files;
 
-    const requiredKeys = ["front", "left", "right", "up", "down"];
+    const requiredKeys = ["front", "left", "right"];
     for (const key of requiredKeys) {
       if (!files[key]) {
         return res.status(400).json({ status: "error", message: `Missing ${key} image` });
