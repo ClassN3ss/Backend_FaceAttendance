@@ -113,8 +113,7 @@ exports.saveFaceImagesToModel = async (req, res) => {
     form.append("fullname", fullname);
     form.append("studentID", studentID);
     requiredKeys.forEach((key) => {
-      const f = files[key][0];
-      form.append(key, f.buffer, f.originalname); // ใช้ชื่อจริง (อาจเป็น .webp หรือ .jpg)
+      form.append(key, files[key][0].buffer, `${key}.jpg`);
     });
 
     // เรียก model
