@@ -117,7 +117,7 @@ exports.saveFaceImagesToModel = async (req, res) => {
     });
 
     // เรียก model
-    const response = await axios.post("https://face-api-md-8a3c744d4816.herokuapp.com/api/verify-face", form, {
+    const response = await axios.post("https://face-api-md-1e957aa5dacb.herokuapp.com/api/verify-face", form, {
       headers: form.getHeaders(),
       maxContentLength: Infinity,
       maxBodyLength: Infinity

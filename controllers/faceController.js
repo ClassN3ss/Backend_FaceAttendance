@@ -8,7 +8,7 @@ const axios = require("axios");
 const INTERNAL_KEY = process.env.INTERNAL_FACE_API_KEY || "dev-internal-key";
 const THRESHOLD = Number(process.env.FACE_MATCH_THRESHOLD || 0.4);
 const TEACHER_THRESHOLD = Number(process.env.FACE_MATCH_THRESHOLD || 0.5);
-const MODEL_BASE_URL = process.env.MODEL_BASE_URL || "https://face-api-md-8a3c744d4816.herokuapp.com";
+const MODEL_BASE_URL = process.env.MODEL_BASE_URL || "https://face-api-md-1e957aa5dacb.herokuapp.com";
 
 exports.verifyByImage = async (req, res) => {
   try {
