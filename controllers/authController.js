@@ -101,6 +101,10 @@ exports.saveFaceImagesToModel = async (req, res) => {
     const { fullname, studentID } = req.body;
     const files = req.files;
 
+    console.log("📥 Received save-face-model request");
+    console.log("   fullname:", fullname, "studentID:", studentID);
+    console.log("   Files received:", Object.keys(files || {})); // ✅ log keys ของไฟล์ที่มา
+
     const requiredKeys = ["front", "left", "right", "up", "down"];
     for (const key of requiredKeys) {
       if (!files[key]) {
