@@ -223,8 +223,6 @@ exports.saveTeacherFace = async (req, res) => {
     // ✅ บันทึก descriptor + สถานะลง Mongo
     user.faceEncodings = data.descriptor;            // Array length 128
     user.faceScanned = true;                          // เคยสแกนแล้ว
-    user.faceImagePath = data.imagePath || null;      // "teacher/<folder>/<folder>.jpg"
-    user.personKey = data.personKey || null;          // "<folder>" หลัง sanitize
     user.faceSavedAt = new Date();
     await user.save();
 
@@ -232,7 +230,6 @@ exports.saveTeacherFace = async (req, res) => {
       ok: true,
       message: 'บันทึกใบหน้าสำเร็จ',
       teacher: { id: user._id, fullName: fullname.trim() },
-      imagePath: user.faceImagePath,
     });
   } catch (err) {
     console.error('Save teacher face failed:', err);
