@@ -51,7 +51,6 @@ async function createClassFromXlsx(buffer, email) {
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
   const rows = xlsx.utils.sheet_to_json(sheet, { header: 1 });
 
-  // ✅ ตรวจสอบหัวตารางว่ามีคำว่า "เลข" และ "ชื่อ"
   const headerRow = rows[6];
   if (!headerRow || !headerRow[1]?.toString().includes("เลข") || !headerRow[2]?.toString().includes("ชื่อ")) {
     throw new Error(`❌ รูปแบบไฟล์ไม่ถูกต้อง: ไม่พบหัวคอลัมน์ "เลข" หรือ "ชื่อ - สกุล" ที่แถวที่ 8`);
@@ -75,7 +74,7 @@ async function createClassFromXlsx(buffer, email) {
   // ✅ ค้นหาหรือสร้างอาจารย์
   let teacher = await User.findOne({ fullName: teacherName.trim(), role: "teacher" });
   if (!teacher) {
-    const hashed = await bcrypt.hash("teacher123", 10);
+    const hashed = bcrypt.hashSync("teacher123", 10);
     teacher = await User.create({
       username: newEmail,
       fullName: teacherName.trim(),
@@ -85,7 +84,6 @@ async function createClassFromXlsx(buffer, email) {
     });
     newTeacherCreated = true;
   } else {
-    // ✅ ตรวจสอบว่ามีคนอื่นใช้ username/email นี้อยู่หรือไม่
     if (teacher.email !== newEmail || teacher.username !== newEmail) {
       const existing = await User.findOne({ username: newEmail });
       if (existing && existing._id.toString() !== teacher._id.toString()) {
@@ -97,61 +95,59 @@ async function createClassFromXlsx(buffer, email) {
     }
   }
 
-  // ✅ ประมวลผลนักศึกษา
-  const students = [];
+  // ✅ เตรียมข้อมูลนักศึกษา
   const seen = new Set();
+  const studentDocs = [];
+  const defaultHash = bcrypt.hashSync("student123", 10);
 
   for (let i = 8; i < rows.length; i++) {
     const row = rows[i];
     const rawId = String(row[1] || "").trim();
-    const emailId = rawId.replace(/-/g, "");
-    const usernameId = rawId.replace(/-/g, "");
     const fullName = String(row[2] || "").trim();
-
-    if (!rawId && !fullName) {
-      const hasMore = rows.slice(i + 1).some(r => (r[1]?.toString().trim() || r[2]?.toString().trim()));
-      if (hasMore) throw new Error(`❌ พบแถวว่างก่อนจบรายชื่อ (แถวที่ ${i + 1})`);
-      break;
-    }
-
-    if (!rawId || !fullName) {
-      throw new Error(`❌ ข้อมูลไม่ครบในแถวที่ ${i + 1}`);
-    }
-
+    if (!rawId && !fullName) break;
+    if (!rawId || !fullName) continue;
     if (seen.has(rawId)) continue;
     seen.add(rawId);
 
+    const emailId = rawId.replace(/-/g, "");
+    const usernameId = emailId;
     const studentEmail = `s${emailId}@email.kmutnb.ac.th`;
-    let user = await User.findOne({ studentId: rawId });
 
-    if (!user) {
-      const hashed = await bcrypt.hash(rawId, 10);
-      user = await User.create({
-        studentId: rawId,
-        username: usernameId,
-        fullName,
-        email: studentEmail,
-        password_hash: hashed,
-        role: "student"
-      });
-    } else {
-      if (user.fullName !== fullName) {
-        user.fullName = fullName;
-        await user.save();
-      }
-    }
-
-    students.push(user._id);
+    studentDocs.push({
+      studentId: rawId,
+      username: usernameId,
+      fullName,
+      email: studentEmail,
+      password_hash: defaultHash,
+      role: "student"
+    });
   }
 
-  if (students.length === 0) throw new Error("❌ ไม่พบนักศึกษาในไฟล์");
+  if (studentDocs.length === 0) throw new Error("❌ ไม่พบนักศึกษาในไฟล์");
 
-  // ✅ ค้นหาหรือสร้างคลาส
+  // ✅ ใช้ bulkWrite เพื่อ insert/update ทั้งหมดในรอบเดียว
+  await User.bulkWrite(
+    studentDocs.map(doc => ({
+      updateOne: {
+        filter: { studentId: doc.studentId },
+        update: { $set: doc },
+        upsert: true
+      }
+    }))
+  );
+
+  // ✅ ดึง _id ของนักศึกษาทั้งหมด
+  const studentIds = await User.find(
+    { studentId: { $in: studentDocs.map(s => s.studentId) } },
+    { _id: 1 }
+  ).lean();
+
+  // ✅ สร้างหรืออัปเดตคลาส
   let classDoc = await Class.findOne({ courseCode, section: sectionStr });
   if (classDoc) {
     classDoc.courseName = courseName;
     classDoc.teacherId = teacher._id;
-    classDoc.students = students;
+    classDoc.students = studentIds.map(s => s._id);
     await classDoc.save();
   } else {
     classDoc = await Class.create({
@@ -159,7 +155,7 @@ async function createClassFromXlsx(buffer, email) {
       courseName,
       section: sectionStr,
       teacherId: teacher._id,
-      students
+      students: studentIds.map(s => s._id)
     });
   }
 
