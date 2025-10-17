@@ -130,7 +130,18 @@ async function createClassFromXlsx(buffer, email) {
     studentDocs.map(doc => ({
       updateOne: {
         filter: { studentId: doc.studentId },
-        update: { $set: doc },
+        update: {
+          $set: {
+            studentId: doc.studentId,
+            fullName: doc.fullName,
+            username: doc.username,
+            password_hash: doc.password_hash,
+            role: doc.role,
+            email: doc.email,
+            faceScanned: false,   // ✅ ถ้ามี field นี้ใน schema
+            faceEncodings: {},    // ✅ ถ้ามี field นี้ใน schema
+          }
+        },
         upsert: true
       }
     }))
