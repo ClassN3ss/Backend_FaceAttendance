@@ -51,6 +51,7 @@ async function createClassFromXlsx(buffer, email) {
   const sheet = workbook.Sheets[workbook.SheetNames[0]];
   const rows = xlsx.utils.sheet_to_json(sheet, { header: 1 });
 
+  // ✅ ตรวจสอบหัวตาราง
   const headerRow = rows[6];
   if (!headerRow || !headerRow[1]?.toString().includes("เลข") || !headerRow[2]?.toString().includes("ชื่อ")) {
     throw new Error(`❌ รูปแบบไฟล์ไม่ถูกต้อง: ไม่พบหัวคอลัมน์ "เลข" หรือ "ชื่อ - สกุล" ที่แถวที่ 8`);
@@ -74,7 +75,7 @@ async function createClassFromXlsx(buffer, email) {
   // ✅ ค้นหาหรือสร้างอาจารย์
   let teacher = await User.findOne({ fullName: teacherName.trim(), role: "teacher" });
   if (!teacher) {
-    const hashed = bcrypt.hashSync("teacher123", 10);
+    const hashed = await bcrypt.hash("teacher123", 10);
     teacher = await User.create({
       username: newEmail,
       fullName: teacherName.trim(),
@@ -115,17 +116,19 @@ async function createClassFromXlsx(buffer, email) {
 
     studentDocs.push({
       studentId: rawId,
-      username: usernameId,
       fullName,
-      email: studentEmail,
+      username: usernameId,
       password_hash: defaultHash,
-      role: "student"
+      role: "student",
+      email: studentEmail,
+      faceScanned: false,
+      faceEncodings: {}
     });
   }
 
   if (studentDocs.length === 0) throw new Error("❌ ไม่พบนักศึกษาในไฟล์");
 
-  // ✅ ใช้ bulkWrite เพื่อ insert/update ทั้งหมดในรอบเดียว
+  // ✅ ใช้ bulkWrite โดยเรียง key ตามลำดับที่ต้องการ
   await User.bulkWrite(
     studentDocs.map(doc => ({
       updateOne: {
@@ -138,8 +141,8 @@ async function createClassFromXlsx(buffer, email) {
             password_hash: doc.password_hash,
             role: doc.role,
             email: doc.email,
-            faceScanned: false,   // ✅ ถ้ามี field นี้ใน schema
-            faceEncodings: {},    // ✅ ถ้ามี field นี้ใน schema
+            faceScanned: doc.faceScanned,
+            faceEncodings: doc.faceEncodings
           }
         },
         upsert: true
